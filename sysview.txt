@@ -1,0 +1,180 @@
+# ==========================================================================
+# setup
+# ==========================================================================
+
+store orphans array (Qqtd)
+
+store flags from input arguments
+    system_flag   (-s)
+    flatpak_flag  (-f)
+    orphans_flag  (-o)
+    quiet_flag    (-q)
+    help_flag     (-h)
+
+define invalid_flag = false
+
+for each arg in input arguments:
+    if arg is not one of (-s, -f, -o, -h, -q):
+        set invalid_flag = true
+
+define run_all = true if no flags are provided (ignoring quiet_flag)
+
+# ==========================================================================
+# loading function
+# ==========================================================================
+
+define loading_anim()
+
+    hide cursor
+
+    repeat loading frames (( / ), ( — ), ( \ ), ( | )) for short duration (bold)
+
+    clear line
+    show cursor
+
+# ==========================================================================
+# system function
+# ==========================================================================
+
+define show_system()
+
+    convert orphans array → set (qqtd_set)
+    store top_pkgs array (Qqtt)
+
+    define system array
+
+    for each pkg in top_pkgs:
+        if pkg does not exist in qqtd_set:
+            add pkg to system
+
+    if not quiet_flag:
+        convert system array → set (system_set)
+
+        store sys_pkgs_info dictionary by parsing (pacman -Qi system output line-by-line)
+            track current_pkg
+
+            for each optional dependency found:
+                extract dependency name
+
+                if dependency exists in system_set:
+                    append dependency to sys_pkgs_info[current_pkg]
+
+    print "system (count) (bold)"
+
+    for each pkg in system:
+        print pkg (with prefix)
+
+        if pkg has children:
+            for each child of pkg:
+                print child (with prefix) (dim)
+
+    print newline
+
+# ==========================================================================
+# flatpak function
+# ==========================================================================
+
+define show_flatpak()
+
+    if flatpak is not installed:
+        return
+
+    uninstall unused flatpak runtimes silently
+
+    store flatpak_app_names array
+
+    if flatpak_app_names array is not empty:
+        print "flatpak (count) (bold)"
+
+        for each app in flatpak_app_names:
+            print app (with prefix)
+
+        print newline
+
+# ==========================================================================
+# orphans function
+# ==========================================================================
+
+define show_orphans()
+
+    if orphans array is empty:
+        return
+
+    print "orphans (count) (red)"
+
+    for each pkg in orphans:
+        print pkg (with prefix) (dark red)
+
+    prompt to uninstall all orphans (y/n), default: n
+
+    if user confirms:
+        uninstall all orphans
+
+    print newline
+
+# ==========================================================================
+# help function
+# ==========================================================================
+
+define show_help()
+
+    print "usage: sysview (-s) (-f) (-o) (-q) (-h)"
+
+    print "  -s    show system packages"
+    print "  -f    show flatpak apps"
+    print "  -o    show orphan packages"
+    print "  -q    quiet output"
+    print "  -h    show this help message"
+
+    print newline
+
+# ==========================================================================
+# execution
+# ==========================================================================
+
+print newline
+
+if invalid_flag is true:
+    print "invalid flag"
+    call show_help
+    stop execution
+
+if run_all:
+    if not -q:
+        call loading_anim
+    call show_system
+    call show_flatpak
+    call show_orphans
+
+otherwise:
+
+    for each arg in input arguments (in order):
+
+        if arg is -s:
+            call show_system
+
+        if arg is -f:
+            call show_flatpak
+
+        if arg is -o:
+            call show_orphans
+        
+        if arg is -h:
+            call show_help
+
+# ==========================================================================
+# prefix rules
+# ==========================================================================
+
+system packages, flatpak apps, orphans (no prefix if -q)
+    last item:    "│\n└─ "
+    otherwise:    "│\n├─ "
+
+children
+    if parent is last:
+        last child:    "   └─ "
+        otherwise:     "   ├─ "
+
+    otherwise:
+        last child:    "│  └─ "
+        otherwise:     "│  ├─ "
