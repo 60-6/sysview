@@ -4,9 +4,6 @@ sysview() {
     # setup
     # ==========================================================================
 
-    local Qqtd
-    mapfile -t Qqtd < <(pacman -Qqtd 2>/dev/null)
-
     local system_flag=0 flatpak_flag=0 orphans_flag=0 quiet_flag=0 help_flag=0 invalid_flag=0
 
     for arg in "$@"; do
@@ -21,7 +18,7 @@ sysview() {
     done
 
     local run_all=0
-    [[ $system_flag -eq 0 && $flatpak_flag -eq 0 && $orphans_flag -eq 0 && $help_flag -eq 0 ]] && run_all=1
+    [[ $system_flag == 0 && $flatpak_flag == 0 && $orphans_flag == 0 && $help_flag == 0 ]] && run_all=1
 
     local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[0m" hide_cur="\e[?25l" show_cur="\e[?25h"
 
@@ -44,6 +41,9 @@ sysview() {
     # ==========================================================================
 
     show_system() {
+        local Qqtd
+        mapfile -t Qqtd < <(pacman -Qqtd 2>/dev/null)
+
         local Qqtt
         mapfile -t Qqtt < <(pacman -Qqtt)
 
@@ -58,7 +58,7 @@ sysview() {
         done
 
         local -A sys_pkgs_info
-        if [[ $quiet_flag -eq 0 ]]; then
+        if [[ $quiet_flag == 0 ]]; then
             local -A system_set
             for pkg in "${system[@]}"; do
                 system_set[$pkg]=1
@@ -83,16 +83,15 @@ sysview() {
         echo -e "${bold}system (${#system[@]})${reset}"
         for i in "${!system[@]}"; do
             local pkg="${system[$i]}"
-            local is_last=0; [[ $i -eq $((${#system[@]} - 1)) ]] && is_last=1
-            [[ $quiet_flag -eq 0 ]] && echo "│"
-            [[ $is_last == 1 ]] && echo "$([[ $quiet_flag -eq 0 ]] && echo '└─ ')$pkg" || echo "$([[ $quiet_flag -eq 0 ]] && echo '├─ ')$pkg"
+            local is_last=0; [[ $i == $((${#system[@]} - 1)) ]] && is_last=1
+            [[ $is_last == 1 ]] && echo -e "$([[ $quiet_flag == 0 ]] && echo '│\n└─ ')$pkg" || echo -e "$([[ $quiet_flag == 0 ]] && echo '│\n├─ ')$pkg"
 
             if [[ -n "${sys_pkgs_info[$pkg]}" ]]; then
                 local children
                 read -ra children <<< "${sys_pkgs_info[$pkg]}"
 
                 for j in "${!children[@]}"; do
-                    local child_is_last=0; [[ $j -eq $((${#children[@]} - 1)) ]] && child_is_last=1
+                    local child_is_last=0; [[ $j == $((${#children[@]} - 1)) ]] && child_is_last=1
                     if [[ $is_last == 1 ]]; then
                         [[ $child_is_last == 1 ]] && echo -e "${dim}   └─ ${children[$j]}${reset}" || echo -e "${dim}   ├─ ${children[$j]}${reset}"
                     else
@@ -116,13 +115,12 @@ sysview() {
         local flatpak_app_names
         mapfile -t flatpak_app_names < <(flatpak list --app --columns=name 2>/dev/null)
 
-        [[ ${#flatpak_app_names[@]} -eq 0 ]] && return
+        [[ ${#flatpak_app_names[@]} == 0 ]] && return
 
         echo -e "${bold}flatpak (${#flatpak_app_names[@]})${reset}"
         for i in "${!flatpak_app_names[@]}"; do
-            local is_last=0; [[ $i -eq $((${#flatpak_app_names[@]} - 1)) ]] && is_last=1
-            [[ $quiet_flag -eq 0 ]] && echo "│"
-            [[ $is_last == 1 ]] && echo "$([[ $quiet_flag -eq 0 ]] && echo '└─ ')${flatpak_app_names[$i]}" || echo "$([[ $quiet_flag -eq 0 ]] && echo '├─ ')${flatpak_app_names[$i]}"
+            local is_last=0; [[ $i == $((${#flatpak_app_names[@]} - 1)) ]] && is_last=1
+            [[ $is_last == 1 ]] && echo -e "$([[ $quiet_flag == 0 ]] && echo '│\n└─ ')${flatpak_app_names[$i]}" || echo -e "$([[ $quiet_flag == 0 ]] && echo '│\n├─ ')${flatpak_app_names[$i]}"
         done
         echo
     }
@@ -132,13 +130,15 @@ sysview() {
     # ==========================================================================
 
     show_orphans() {
-        [[ ${#Qqtd[@]} -eq 0 ]] && return
+        local Qqtd
+        mapfile -t Qqtd < <(pacman -Qqtd 2>/dev/null)
+
+        [[ ${#Qqtd[@]} == 0 ]] && return
 
         echo -e "${red}orphans (${#Qqtd[@]})${reset}"
         for i in "${!Qqtd[@]}"; do
-            local is_last=0; [[ $i -eq $((${#Qqtd[@]} - 1)) ]] && is_last=1
-            [[ $quiet_flag -eq 0 ]] && echo -e "${red}│${reset}"
-            [[ $is_last == 1 ]] && echo -e "${red}$([[ $quiet_flag -eq 0 ]] && echo '└─ ')${Qqtd[$i]}${reset}" || echo -e "${red}$([[ $quiet_flag -eq 0 ]] && echo '├─ ')${Qqtd[$i]}${reset}"
+            local is_last=0; [[ $i == $((${#Qqtd[@]} - 1)) ]] && is_last=1
+            [[ $is_last == 1 ]] && echo -e "${red}$([[ $quiet_flag == 0 ]] && echo '│\n└─ ')${Qqtd[$i]}${reset}" || echo -e "${red}$([[ $quiet_flag == 0 ]] && echo '│\n├─ ')${Qqtd[$i]}${reset}"
         done
 
         read -rp "$(echo -e "\nuninstall orphans? (y/${bold}n${reset}) ")" confirm
@@ -151,12 +151,12 @@ sysview() {
     # ==========================================================================
 
     show_help() {
-        echo -e "usage: sysview (-s) (-f) (-o) (-q) (-h)"
-        echo -e "  -s    show system packages"
-        echo -e "  -f    show flatpak apps"
-        echo -e "  -o    show orphan packages"
-        echo -e "  -q    quiet output"
-        echo -e "  -h    show this help message"
+        echo "usage: sysview (-s) (-f) (-o) (-q) (-h)"
+        echo "  -s    show system packages"
+        echo "  -f    show flatpak apps"
+        echo "  -o    show orphan packages"
+        echo "  -q    quiet output"
+        echo "  -h    show this help message"
         echo
     }
 
@@ -166,14 +166,14 @@ sysview() {
 
     echo
 
-    if [[ $invalid_flag -eq 1 ]]; then
+    if [[ $invalid_flag == 1 ]]; then
         echo "invalid flag"
         show_help
         return 1
     fi
 
-    if [[ $run_all -eq 1 ]]; then
-        [[ $quiet_flag -eq 0 ]] && loading_anim
+    if [[ $run_all == 1 ]]; then
+        [[ $quiet_flag == 0 ]] && loading_anim
         show_system
         show_flatpak
         show_orphans
