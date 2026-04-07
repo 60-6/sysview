@@ -8,6 +8,4 @@ bash function for arch linux:
   
     view orphans and optionally remove them
   
-to use it, add it at the end of ~/.bashrc and type "sysview" in the terminal
-
 "sysview -h" for extra flags
