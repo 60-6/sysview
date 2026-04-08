@@ -1,5 +1,9 @@
 sysview() {
 
+    # —————————————————————————————————————————————————————————————————————————————————————————— scoping
+
+    local f no_default quiet_flag invalid_flag bold dim red reset hide_cur show_cur loading_pid Qqtd Qqtt pkg system dep i is_last pfx j children child child_is_last indent cpfx flatpak_app_names app answer
+
     # —————————————————————————————————————————————————————————————————————————————————————————— setup
 
     no_default= quiet_flag= invalid_flag=
@@ -31,7 +35,7 @@ sysview() {
                 done
             done &
         } 2>/dev/null
-        
+
         echo -en $hide_cur
         loading_pid=$!
     }
@@ -229,5 +233,9 @@ sysview() {
             h) show_help ;;
         esac
     done
+    
+    # —————————————————————————————————————————————————————————————————————————————————————————— clean up
+    
+    unset start_loading stop_loading show_system show_flatpak show_orphans show_help
 
 }
