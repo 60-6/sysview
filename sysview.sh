@@ -1,13 +1,13 @@
 sysview() {
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— scoping
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── scoping
 
-    local arg mode quiet_flag invalid_flag bold dim red reset hide_cur show_cur loading_pid Qqtd Qqtt pkg system dep i is_last pfx j children child child_is_last indent cpfx flatpak_app_names app answer
+    local arg mode quiet_flag invalid_flag bold dim red reset hide_cur show_cur top_pkgs orphans pkg system dep i is_last pfx j children child child_is_last indent cpfx flatpak_apps answer
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— setup
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── setup
 
     mode= quiet_flag= invalid_flag=
-    
+
     for arg
     do
         case $arg in
@@ -19,56 +19,60 @@ sysview() {
 
     bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— loading
-    
-    start_loading() {
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── loading
+
+    loading_f() {
+        (( loading_pid )) && {
+            eval "${old_trap:-trap - INT}"
+            kill $loading_pid
+            wait $loading_pid &>/dev/null
+            loading_pid=
+            echo -en "\e[K$show_cur"
+            return
+        }
+
         {
-            while true
+            while :
             do
                 for c in "( / )" "( — )" "( \ )" "( | )"
                 do
-                    echo -en "\r${bold}${c}${reset}"
+                    echo -en "$bold$c$reset\r"
                     sleep 0.02
                 done
             done &
         } 2>/dev/null
 
+        declare -g loading_pid=$! old_trap=$(trap -p INT)
         echo -en $hide_cur
-        loading_pid=$!
+        trap loading_f INT
     }
 
-    stop_loading() {
-        kill $loading_pid
-        wait $loading_pid 2>/dev/null
-        echo -en "\r     \r$show_cur"
-    }
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── system
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— system
-    
     system_f() {
-        start_loading
+        loading_f
 
-        mapfile -t Qqtd < <(pacman -Qqtd)
-        mapfile -t Qqtt < <(pacman -Qqtt)
+        mapfile -t top_pkgs < <(pacman -Qqtt)
+        mapfile -t orphans < <(pacman -Qqtd)
 
         local -A orphans_set system_set sys_pkgs_info
-        
-        for pkg in ${Qqtd[@]}
+
+        for pkg in ${orphans[@]}
         do orphans_set[$pkg]=1
         done
 
         system=()
-        for pkg in ${Qqtt[@]}
+        for pkg in ${top_pkgs[@]}
         do (( orphans_set[$pkg] )) || system+=($pkg)
         done
-        
+
         (( quiet_flag )) || {
             for pkg in ${system[@]}
             do system_set[$pkg]=1
             done
 
             while read -r pkg dep
-            do (( system_set[$dep] )) && sys_pkgs_info[$pkg]+=$dep\ 
+            do (( system_set[$dep] )) && sys_pkgs_info[$pkg]+="$dep "
             done < <(LC_ALL=C pacman -Qi ${system[@]} | awk '
                 /^Name/ {
                     pkg = $NF
@@ -91,110 +95,108 @@ sysview() {
             ')
         }
 
-        stop_loading
+        loading_f
 
-        echo -e "${bold}system (${#system[@]})${reset}"
-        
+        echo -e "${bold}system (${#system[@]})$reset"
+
         for i in ${!system[@]}
         do
             pkg=${system[$i]}
-            
-            (( i == ${#system[@]} - 1 )) && is_last=1 || is_last=
+
+            is_last=$(( i == ${#system[@]} - 1 ))
 
             (( quiet_flag )) && pfx= || {
                 (( is_last )) && pfx=$'│\n└─ ' || pfx=$'│\n├─ '
             }
-            
-            echo -e "${pfx}${pkg}"
+
+            echo -e "$pfx$pkg"
 
             read -a children <<< ${sys_pkgs_info[$pkg]}
 
             for j in ${!children[@]}
             do
                 child=${children[$j]}
-                    
-                (( j == ${#children[@]} - 1 )) && child_is_last=1 || child_is_last=
+
+                child_is_last=$(( j == ${#children[@]} - 1 ))
 
                 (( is_last )) && indent="   " || indent="│  "
                 (( child_is_last )) && cpfx="└─ " || cpfx="├─ "
-                    
-                echo -e "${indent}${dim}${cpfx}${child}${reset}"
+
+                echo -e "$indent$dim$cpfx$child$reset"
             done
         done
-        
+
         echo
     }
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— flatpak
-    
-    flatpak_f() {
-        command -v flatpak &>/dev/null || return
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── flatpaks
 
-        start_loading
-        
+    flatpak_f() {
+        loading_f
+
         (( quiet_flag )) || flatpak remove --unused -y &>/dev/null
 
-        mapfile -t flatpak_app_names < <(flatpak list --app --columns=name)
-        
-        stop_loading
+        mapfile -t flatpak_apps < <(flatpak list --app --columns=name 2>/dev/null)
 
-        (( ${#flatpak_app_names[@]} )) || return
+        loading_f
 
-        echo -e "${bold}flatpak (${#flatpak_app_names[@]})${reset}"
-        
-        for i in ${!flatpak_app_names[@]}
+        (( ${#flatpak_apps[@]} )) || return
+
+        echo -e "${bold}flatpaks (${#flatpak_apps[@]})$reset"
+
+        for i in ${!flatpak_apps[@]}
         do
-            app=${flatpak_app_names[$i]}
-        
-            (( i == ${#flatpak_app_names[@]} - 1 )) && is_last=1 || is_last=
+            pkg=${flatpak_apps[$i]}
+
+            is_last=$(( i == ${#flatpak_apps[@]} - 1 ))
 
             (( quiet_flag )) && pfx= || {
                 (( is_last )) && pfx=$'│\n└─ ' || pfx=$'│\n├─ '
             }
-            
-            echo -e "${pfx}${app}"
+
+            echo -e "$pfx$pkg"
         done
-        
+
         echo
     }
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— orphans
-    
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── orphans
+
     orphans_f() {
-        start_loading
-        
-        mapfile -t Qqtd < <(pacman -Qqtd)
-        
-        stop_loading
+        loading_f
 
-        (( ${#Qqtd[@]} )) || return
+        mapfile -t orphans < <(pacman -Qqtd)
 
-        echo -e "${bold}${red}orphans (${#Qqtd[@]})${reset}"
-        
-        for i in ${!Qqtd[@]}
+        loading_f
+
+        (( ${#orphans[@]} )) || return
+
+        echo -e "$bold${red}orphans (${#orphans[@]})$reset"
+
+        for i in ${!orphans[@]}
         do
-            pkg=${Qqtd[$i]}
-        
-            (( i == ${#Qqtd[@]} - 1 )) && is_last=1 || is_last=
+            pkg=${orphans[$i]}
+
+            is_last=$(( i == ${#orphans[@]} - 1 ))
 
             (( quiet_flag )) && pfx= || {
                 (( is_last )) && pfx=$'│\n└─ ' || pfx=$'│\n├─ '
             }
-            
-            echo -e "${red}${pfx}${pkg}${reset}"
+
+            echo -e "$red$pfx$pkg$reset"
         done
 
         (( quiet_flag )) || {
-            echo -en "\nuninstall orphans? (y/${bold}n${reset}) "
+            echo -en "\nuninstall orphans? (y/${bold}n$reset) "
             read -r answer
-            [[ ${answer,,} = y ]] && sudo pacman -Rns ${Qqtd[@]}
+            [[ ${answer,,} = y ]] && sudo pacman -Rns ${orphans[@]}
         }
-        
+
         echo
     }
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— help
-    
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── help
+
     help_f() {
         echo "usage: sysview (s) (f) (o) (q) (h)"
         echo "  s    show system packages"
@@ -205,7 +207,7 @@ sysview() {
         echo
     }
 
-    # —————————————————————————————————————————————————————————————————————————————————————————— execution
+    # ──────────────────────────────────────────────────────────────────────────────────────────────── execution
 
     echo
 
@@ -214,7 +216,7 @@ sysview() {
         help_f
         return
     }
-    
+
     (( mode )) || {
         system_f
         flatpak_f
@@ -231,9 +233,5 @@ sysview() {
             h) help_f ;;
         esac
     done
-    
-    # —————————————————————————————————————————————————————————————————————————————————————————— clean up
-    
-    unset start_loading stop_loading system_f flatpak_f orphans_f help_f
 
 }
