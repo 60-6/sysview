@@ -2,19 +2,19 @@ sysview() {
 
     # —————————————————————————————————————————————————————————————————————————————————————————— scoping
 
-    local f no_default quiet_flag invalid_flag bold dim red reset hide_cur show_cur loading_pid Qqtd Qqtt pkg system dep i is_last pfx j children child child_is_last indent cpfx flatpak_app_names app answer
+    local arg mode quiet_flag invalid_flag bold dim red reset hide_cur show_cur loading_pid Qqtd Qqtt pkg system dep i is_last pfx j children child child_is_last indent cpfx flatpak_app_names app answer
 
     # —————————————————————————————————————————————————————————————————————————————————————————— setup
 
-    no_default= quiet_flag= invalid_flag=
+    mode= quiet_flag= invalid_flag=
     
-    for f
+    for arg
     do
-        case $f in
-            s) no_default=1 ;;
-            f) no_default=1 ;;
-            o) no_default=1 ;;
-            h) no_default=1 ;;
+        case $arg in
+            s) mode=1 ;;
+            f) mode=1 ;;
+            o) mode=1 ;;
+            h) mode=1 ;;
             q) quiet_flag=1 ;;
             *) invalid_flag=1 ;;
         esac
@@ -48,7 +48,7 @@ sysview() {
 
     # —————————————————————————————————————————————————————————————————————————————————————————— system
     
-    show_system() {
+    system_f() {
         start_loading
 
         mapfile -t Qqtd < <(pacman -Qqtd)
@@ -130,7 +130,7 @@ sysview() {
 
     # —————————————————————————————————————————————————————————————————————————————————————————— flatpak
     
-    show_flatpak() {
+    flatpak_f() {
         command -v flatpak &>/dev/null || return
 
         start_loading
@@ -163,7 +163,7 @@ sysview() {
 
     # —————————————————————————————————————————————————————————————————————————————————————————— orphans
     
-    show_orphans() {
+    orphans_f() {
         start_loading
         
         mapfile -t Qqtd < <(pacman -Qqtd)
@@ -198,7 +198,7 @@ sysview() {
 
     # —————————————————————————————————————————————————————————————————————————————————————————— help
     
-    show_help() {
+    help_f() {
         echo "usage: sysview (s) (f) (o) (q) (h)"
         echo "  s    show system packages"
         echo "  f    show flatpak apps"
@@ -214,28 +214,29 @@ sysview() {
 
     (( invalid_flag )) && {
         echo "invalid flag"
-        show_help
+        help_f
         return
     }
     
-    (( no_default )) || {
-        show_system
-        show_flatpak
-        show_orphans
+    (( mode )) || {
+        system_f
+        flatpak_f
+        orphans_f
+        return
     }
 
-    for f
+    for arg
     do
-        case $f in
-            s) show_system ;;
-            f) show_flatpak ;;
-            o) show_orphans ;;
-            h) show_help ;;
+        case $arg in
+            s) system_f ;;
+            f) flatpak_f ;;
+            o) orphans_f ;;
+            h) help_f ;;
         esac
     done
     
     # —————————————————————————————————————————————————————————————————————————————————————————— clean up
     
-    unset start_loading stop_loading show_system show_flatpak show_orphans show_help
+    unset start_loading stop_loading system_f flatpak_f orphans_f help_f
 
 }
