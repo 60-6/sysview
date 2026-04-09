@@ -2,7 +2,7 @@
 
 bash function for arch linux:
 
-    view top level system packages and their associations with each other
+    view top level system packages and their associations
   
     view flatpak apps (auto-uninstalls unused runtimes)
   
