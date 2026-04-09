@@ -11,10 +11,7 @@ sysview() {
     for arg
     do
         case $arg in
-            s) mode=1 ;;
-            f) mode=1 ;;
-            o) mode=1 ;;
-            h) mode=1 ;;
+            s|f|o|h) mode=1 ;;
             q) quiet_flag=1 ;;
             *) invalid_flag=1 ;;
         esac
