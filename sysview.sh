@@ -38,34 +38,29 @@ sysview() {
 
             mapfile -t system < <(comm -23 <(pacman -Qqtt | sort) <(pacman -Qqtd | sort))
 
-            local -A system_set sys_pkgs_info
+            local -A system_dict
 
             (( minimal )) || {
                 for pkg in ${system[@]}
-                do system_set[$pkg]=1
+                do system_dict[$pkg]=
                 done
 
                 while read -r pkg dep
-                do (( system_set[$dep] )) && sys_pkgs_info[$pkg]+="$dep "
+                do [[ -v system_dict[$dep] ]] && system_dict[$pkg]+="$dep "
                 done < <(LC_ALL=C pacman -Qi ${system[@]} | awk '
-                    /^Name/ {
-                        pkg = $NF
-                        next
-                    }
+                    /^Name/ { pkg = $NF }
                     /^Optional Deps/ {
                         gsub(/^Optional Deps *: *|:.*/, "")
                         print pkg, $0
-                        found = 1
+                        opt_deps = 1
                         next
                     }
-                    found && /^ / {
+                    opt_deps && /^ / {
                         gsub(/^ +|:.*/, "")
                         print pkg, $0
                         next
                     }
-                    {
-                        found = 0
-                    }
+                    { opt_deps = 0 }
                 ')
             }
 
@@ -85,7 +80,7 @@ sysview() {
 
                 echo -e "$pfx$pkg"
 
-                children=(${sys_pkgs_info[$pkg]})
+                children=(${system_dict[$pkg]})
 
                 for j in ${!children[@]}
                 do
@@ -183,7 +178,7 @@ sysview() {
 
     :;} || {
 
-        local minimal loading_pid old_trap system pkg dep i last pfx j children last_child indent orphans flatpaks answer
+        local loading_pid old_trap system minimal pkg dep i last pfx j children last_child indent orphans flatpaks answer
         local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
 
         local executing=1
