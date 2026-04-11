@@ -1,4 +1,4 @@
-# ──────────────────────────────────────────────────────────────────────────────────────────── \\ ▼ // ──────────────────────────────────────────────────────────────────────────────────────────── #
+# ─────────────────────────────────────────────────────────────────────────────────────────── \\  ▼  // ─────────────────────────────────────────────────────────────────────────────────────────── #
                                                                                                atlas()
 {
 
@@ -130,7 +130,7 @@
                 echo -e "$pfx$pkg"
             done
 
-            queue+=(ex_flatpaks_prompt)
+            queue+=(ex_upgrade)
 
             echo
         }
@@ -157,7 +157,7 @@
                 echo -e "$red$pfx$pkg$reset"
             done
 
-            queue+=(ex_orphans_prompt)
+            queue+=(ex_cleanup)
 
             echo
         }
@@ -173,7 +173,7 @@
                 atlas ex_loading
             }
 
-            [[ $1 = ex_flatpaks_prompt ]] && {
+            [[ $1 = ex_upgrade ]] && {
                 lmsg="${dim}checking updates$reset"
                 atlas ex_loading
                 mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
@@ -191,7 +191,7 @@
                 echo
             }
 
-            [[ $1 = ex_orphans_prompt ]] && {
+            [[ $1 = ex_cleanup ]] && {
                 echo -en "uninstall orphans? (y/${bold}n$reset) "
                 read ans
                 [[ ${ans,,} = y ]] && sudo pacman -Rns ${orphans[@]}
@@ -216,9 +216,9 @@
         for arg
         do
             case $arg in
-                s) [[ ${queue[@]} = ex_system ]] || queue+=(ex_system) ;;
-                f) [[ ${queue[@]} = ex_flatpaks ]] || queue+=(ex_flatpaks) ;;
-                o) [[ ${queue[@]} = ex_orphans ]] || queue+=(ex_orphans) ;;
+                s) [[ ${queue[@]} = *ex_system* ]] || queue+=(ex_system) ;;
+                f) [[ ${queue[@]} = *ex_flatpaks* ]] || queue+=(ex_flatpaks) ;;
+                o) [[ ${queue[@]} = *ex_orphans* ]] || queue+=(ex_orphans) ;;
                 q) quiet=1 ;;
                 *) atlas ex_help; return ;;
             esac
