@@ -4,6 +4,47 @@
 
     (( executing )) && {
 
+# ────────────── help ─────────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_help ]] && {
+            echo "usage:  atlas (s) (f) (o) (q)"
+            echo "  s  ➞  show system packages"
+            echo "  f  ➞  show flatpak apps"
+            echo "  o  ➞  show orphan packages"
+            echo "  q  ➞  quiet mode"
+
+            echo
+        }
+
+# ────────────── loading ──────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_loading ]] && {
+            (( lpid )) && {
+                eval "${ptrap:-trap - 2}"
+                kill $lpid
+                wait $lpid &>/dev/null
+                lpid=
+                echo -en "\r\e[K$show_cur"
+                return
+            }
+
+            {
+                while :
+                do
+                    for c in "( / )" "( — )" "( \ )" "( | )"
+                    do
+                        echo -en "\e[s$bold$c$reset\e[u"
+                        sleep 0.05
+                    done
+                done &
+            } 2>/dev/null
+
+            lpid=$!
+            echo -en "$hide_cur"
+            ptrap=$(trap -p 2)
+            trap "atlas ex_loading; kill -2 $$" 2
+        }
+
 # ────────────── system ───────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_system ]] && {
@@ -121,22 +162,29 @@
             echo
         }
 
-# ────────────── prompts ──────────────────────────────────────────────────────────────────────── ●
+# ────────────── extra ────────────────────────────────────────────────────────────────────────── ●
 
         (( quiet )) || {
+
+            [[ $1 = ex_intro ]] && {
+                echo -en "${dim}atlas: executing$reset "
+                atlas ex_loading
+                sleep 0.5
+                atlas ex_loading
+            }
 
             [[ $1 = ex_flatpaks_prompt ]] && {
                 echo -en "${dim}checking updates$reset "
                 atlas ex_loading
-                mapfile -t update_ids < <(flatpak remote-ls --updates --columns=application)
+                mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
                 atlas ex_loading
 
-                (( ${#update_ids[@]} )) || return
+                (( ${#updates[@]} )) || return
 
                 echo -en "upgrade flatpaks? (y/${bold}n$reset) "
-                read -r answer
-                [[ ${answer,,} = y ]] && {
-                    flatpak update ${update_ids[@]}
+                read ans
+                [[ ${ans,,} = y ]] && {
+                    flatpak update ${updates[@]}
                     flatpak remove --unused -y &>/dev/null
                 }
 
@@ -145,60 +193,19 @@
 
             [[ $1 = ex_orphans_prompt ]] && {
                 echo -en "uninstall orphans? (y/${bold}n$reset) "
-                read -r answer
-                [[ ${answer,,} = y ]] && sudo pacman -Rns ${orphans[@]}
+                read ans
+                [[ ${ans,,} = y ]] && sudo pacman -Rns ${orphans[@]}
 
                 echo
             }
 
         }
 
-# ────────────── help ─────────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_help ]] && {
-            echo "usage:  atlas (s) (f) (o) (q)"
-            echo "  s  ➞  show system packages"
-            echo "  f  ➞  show flatpak apps"
-            echo "  o  ➞  show orphan packages"
-            echo "  q  ➞  quiet mode"
-
-            echo
-        }
-
-# ────────────── loading ──────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_loading ]] && {
-            (( loading_pid )) && {
-                eval "${old_trap:-trap - 2}"
-                kill $loading_pid
-                wait $loading_pid &>/dev/null
-                loading_pid=
-                echo -en "\r\e[K$show_cur"
-                return
-            }
-
-            {
-                while :
-                do
-                    for c in "( / )" "( — )" "( \ )" "( | )"
-                    do
-                        echo -en "\e[s$bold$c$reset\e[u"
-                        sleep 0.05
-                    done
-                done &
-            } 2>/dev/null
-
-            loading_pid=$!
-            echo -en $hide_cur
-            old_trap=$(trap -p 2)
-            trap "atlas ex_loading; kill -2 $$" 2
-        }
-
 # ────────────── execution ────────────────────────────────────────────────────────────────────── ●
 
     :;} || {
 
-        local answer children clast dep flatpaks i indent j last loading_pid old_trap orphans pfx pkg quiet system update_ids
+        local quiet lpid ptrap system pkg dep i last pfx j children clast indent flatpaks orphans updates ans
         local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
 
         local executing=1
@@ -209,22 +216,15 @@
         for arg
         do
             case $arg in
-                s) [[ ${queue[*]} = ex_system ]] || queue+=(ex_system) ;;
-                f) [[ ${queue[*]} = ex_flatpaks ]] || queue+=(ex_flatpaks) ;;
-                o) [[ ${queue[*]} = ex_orphans ]] || queue+=(ex_orphans) ;;
+                s) [[ ${queue[@]} = ex_system ]] || queue+=(ex_system) ;;
+                f) [[ ${queue[@]} = ex_flatpaks ]] || queue+=(ex_flatpaks) ;;
+                o) [[ ${queue[@]} = ex_orphans ]] || queue+=(ex_orphans) ;;
                 q) quiet=1 ;;
                 *) atlas ex_help; return ;;
             esac
         done
 
-        (( ${#queue[@]} )) || {
-            echo -en "${dim}atlas: executing$reset "
-            atlas ex_loading
-            sleep 0.5
-            atlas ex_loading
-
-            queue=(ex_system ex_flatpaks ex_orphans)
-        }
+        (( ${#queue[@]} )) || queue=(ex_intro ex_system ex_flatpaks ex_orphans)
 
         while (( index < ${#queue[@]} ))
         do
