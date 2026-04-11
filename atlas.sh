@@ -140,7 +140,7 @@
         [[ $1 = ex_orphans ]] && {
             mapfile -t orphans < <(pacman -Qqtd)
 
-            (( orphans[0] )) || return
+            [[ ${orphans[0]} ]] || return
 
             echo -e $bold$red"orphans (${#orphans[@]})$reset"
 
@@ -179,7 +179,7 @@
                 mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
                 atlas ex_loading
 
-                (( updates[0] )) || return
+                [[ ${updates[0]} ]] || return
 
                 echo -en "upgrade flatpaks? (y/"$bold"n$reset) "
                 read ans
