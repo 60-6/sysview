@@ -8,10 +8,10 @@
 
         [[ $1 = ex_help ]] && {
             echo "usage:  atlas (s) (f) (o) (q)"
-            echo "  s  ➞  show system packages"
-            echo "  f  ➞  show flatpak apps"
-            echo "  o  ➞  show orphan packages"
-            echo "  q  ➞  quiet mode"
+            echo "  s  ➜  system packages"
+            echo "  f  ➜  flatpak apps"
+            echo "  o  ➜  orphan packages"
+            echo "  q  ➜  quiet mode"
 
             echo
         }
@@ -33,7 +33,7 @@
                 do
                     for c in "( / )" "( — )" "( \ )" "( | )"
                     do
-                        echo -en "$bold$c$reset$lmsg\r"
+                        echo -en "$bold$c$reset $lmsg\r"
                         sleep 0.05
                     done
                 done &
@@ -167,14 +167,14 @@
         (( quiet )) || {
 
             [[ $1 = ex_intro ]] && {
-                lmsg="${dim} atlas: executing$reset"
+                lmsg="${dim}atlas: executing$reset"
                 atlas ex_loading
                 sleep 1
                 atlas ex_loading
             }
 
             [[ $1 = ex_flatpaks_prompt ]] && {
-                lmsg="${dim} checking updates$reset"
+                lmsg="${dim}checking updates$reset"
                 atlas ex_loading
                 mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
                 atlas ex_loading
