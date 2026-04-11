@@ -1,11 +1,9 @@
 # atlas
 
-bash function for arch linux:
+## purpose
+arch linux system overview
 
-    view top level system packages and their associations
-  
-    view flatpak apps (auto-uninstalls unused runtimes)
-  
-    view orphans and optionally remove them
-  
+## usage
+it is a single bash function you can paste at the end of .bashrc, no installation needed
+
 "atlas ?" for extra options
