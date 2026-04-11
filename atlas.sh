@@ -1,14 +1,12 @@
-# ────────────────────────────────────────────────────────────────────────────────────────── << atlas >> ────────────────────────────────────────────────────────────────────────────────────────── #
-
-atlas() {
+# ──────────────────────────────────────────────────────────────────────────────────────────── \\ ▼ // ──────────────────────────────────────────────────────────────────────────────────────────── #
+                                                                                               atlas()
+{
 
     (( executing )) && {
 
-# ────────────── system ───────────────────────────────────────────────────────────────────────── ▼
+# ────────────── system ───────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_system ]] && {
-            atlas ex_loading
-
             mapfile -t system < <(comm -23 <(pacman -Qqtt | sort) <(pacman -Qqtd | sort))
 
             local -A system_dict
@@ -37,8 +35,6 @@ atlas() {
                 ')
             }
 
-            atlas ex_loading
-
             echo -e "${bold}system (${#system[@]})$reset"
 
             for i in ${!system[@]}
@@ -62,7 +58,7 @@ atlas() {
                     clast=$(( j == ${#children[@]} - 1 ))
 
                     (( last )) && indent="   " || indent="│  "
-                    (( clast)) && pfx="└─ " || pfx="├─ "
+                    (( clast )) && pfx="└─ " || pfx="├─ "
 
                     echo -e "$indent$dim$pfx$pkg$reset"
                 done
@@ -71,14 +67,10 @@ atlas() {
             echo
         }
 
-# ────────────── flatpaks ─────────────────────────────────────────────────────────────────────── ▼
+# ────────────── flatpaks ─────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_flatpaks ]] && {
-            atlas ex_loading
-
             mapfile -t flatpaks < <(flatpak list --app --columns=name)
-
-            atlas ex_loading
 
             (( ${#flatpaks[@]} )) || return
 
@@ -97,19 +89,15 @@ atlas() {
                 echo -e "$pfx$pkg"
             done
 
-            (( quiet )) || queue+=(ex_flatpaks_prompt)
+            queue+=(ex_flatpaks_prompt)
 
             echo
         }
 
-# ────────────── orphans ──────────────────────────────────────────────────────────────────────── ▼
+# ────────────── orphans ──────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_orphans ]] && {
-            atlas ex_loading
-
             mapfile -t orphans < <(pacman -Qqtd)
-
-            atlas ex_loading
 
             (( ${#orphans[@]} )) || return
 
@@ -128,42 +116,44 @@ atlas() {
                 echo -e "$red$pfx$pkg$reset"
             done
 
-            (( quiet )) || queue+=(ex_orphans_prompt)
+            queue+=(ex_orphans_prompt)
 
             echo
         }
 
-# ────────────── prompts ──────────────────────────────────────────────────────────────────────── ▼
+# ────────────── prompts ──────────────────────────────────────────────────────────────────────── ●
 
-        [[ $1 = ex_flatpaks_prompt ]] && {
-            echo -n "checking updates "
-            atlas ex_loading
+        (( quiet )) || {
 
-            mapfile -t update_ids < <(flatpak remote-ls --updates --columns=application)
+            [[ $1 = ex_flatpaks_prompt ]] && {
+                echo -en "${dim}checking updates$reset "
+                atlas ex_loading
+                mapfile -t update_ids < <(flatpak remote-ls --updates --columns=application)
+                atlas ex_loading
 
-            atlas ex_loading
+                (( ${#update_ids[@]} )) || return
 
-            (( ${#update_ids[@]} )) || return
+                echo -en "upgrade flatpaks? (y/${bold}n$reset) "
+                read -r answer
+                [[ ${answer,,} = y ]] && {
+                    flatpak update ${update_ids[@]}
+                    flatpak remove --unused -y &>/dev/null
+                }
 
-            echo -en "upgrade flatpaks? (y/${bold}n$reset) "
-            read -r answer
-            [[ ${answer,,} = y ]] && {
-                flatpak update ${update_ids[@]}
-                flatpak remove --unused -y &>/dev/null
+                echo
             }
 
-            echo
+            [[ $1 = ex_orphans_prompt ]] && {
+                echo -en "uninstall orphans? (y/${bold}n$reset) "
+                read -r answer
+                [[ ${answer,,} = y ]] && sudo pacman -Rns ${orphans[@]}
+
+                echo
+            }
+
         }
 
-        [[ $1 = ex_orphans_prompt ]] && {
-            echo -en "uninstall orphans? (y/${bold}n$reset) "
-            read -r answer
-            [[ ${answer,,} = y ]] && sudo pacman -Rns ${orphans[@]}
-
-            echo
-        }
-
-# ────────────── help ─────────────────────────────────────────────────────────────────────────── ▼
+# ────────────── help ─────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_help ]] && {
             echo "usage:  atlas (s) (f) (o) (q)"
@@ -175,7 +165,7 @@ atlas() {
             echo
         }
 
-# ────────────── loading ──────────────────────────────────────────────────────────────────────── ▼
+# ────────────── loading ──────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_loading ]] && {
             (( loading_pid )) && {
@@ -193,7 +183,7 @@ atlas() {
                     for c in "( / )" "( — )" "( \ )" "( | )"
                     do
                         echo -en "\e[s$bold$c$reset\e[u"
-                        sleep 0.03
+                        sleep 0.05
                     done
                 done &
             } 2>/dev/null
@@ -204,14 +194,12 @@ atlas() {
             trap "atlas ex_loading; kill -2 $$" 2
         }
 
-    :;} || {
+# ────────────── execution ────────────────────────────────────────────────────────────────────── ●
 
-# ────────────── scoping ──────────────────────────────────────────────────────────────────────── ▼
+    :;} || {
 
         local answer children clast dep flatpaks i indent j last loading_pid old_trap orphans pfx pkg quiet system update_ids
         local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
-
-# ────────────── execution ────────────────────────────────────────────────────────────────────── ▼
 
         local executing=1
         echo
@@ -221,15 +209,22 @@ atlas() {
         for arg
         do
             case $arg in
-                s) queue+=(ex_system) ;;
-                f) queue+=(ex_flatpaks) ;;
-                o) queue+=(ex_orphans) ;;
+                s) [[ ${queue[*]} = ex_system ]] || queue+=(ex_system) ;;
+                f) [[ ${queue[*]} = ex_flatpaks ]] || queue+=(ex_flatpaks) ;;
+                o) [[ ${queue[*]} = ex_orphans ]] || queue+=(ex_orphans) ;;
                 q) quiet=1 ;;
                 *) atlas ex_help; return ;;
             esac
         done
 
-        (( ${#queue[@]} )) || queue=(ex_system ex_flatpaks ex_orphans)
+        (( ${#queue[@]} )) || {
+            echo -en "${dim}atlas: executing$reset "
+            atlas ex_loading
+            sleep 0.5
+            atlas ex_loading
+
+            queue=(ex_system ex_flatpaks ex_orphans)
+        }
 
         while (( index < ${#queue[@]} ))
         do
@@ -241,4 +236,4 @@ atlas() {
 
 }
 
-# ────────────────────────────────────────────────────────────────────────────────────────── >> atlas << ────────────────────────────────────────────────────────────────────────────────────────── #
+# ───────────────────────────────────────────────────────────────────────────────────────── << atlas() >> ───────────────────────────────────────────────────────────────────────────────────────── #
