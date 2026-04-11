@@ -24,7 +24,7 @@
                 kill $lpid
                 wait $lpid &>/dev/null
                 lpid=
-                echo -en "\r\e[K$show_cur"
+                echo -en "\e[K$show_cur"
                 return
             }
 
@@ -33,7 +33,7 @@
                 do
                     for c in "( / )" "( — )" "( \ )" "( | )"
                     do
-                        echo -en "\e[s$bold$c$reset\e[u"
+                        echo -en "$bold$c$reset$lmsg\r"
                         sleep 0.05
                     done
                 done &
@@ -167,14 +167,14 @@
         (( quiet )) || {
 
             [[ $1 = ex_intro ]] && {
-                echo -en "${dim}atlas: executing$reset "
+                lmsg="${dim} atlas: executing$reset"
                 atlas ex_loading
-                sleep 0.5
+                sleep 1
                 atlas ex_loading
             }
 
             [[ $1 = ex_flatpaks_prompt ]] && {
-                echo -en "${dim}checking updates$reset "
+                lmsg="${dim} checking updates$reset"
                 atlas ex_loading
                 mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
                 atlas ex_loading
@@ -205,7 +205,7 @@
 
     :;} || {
 
-        local quiet lpid ptrap system pkg dep i last pfx j children clast indent flatpaks orphans updates ans
+        local quiet lpid ptrap lmsg system pkg dep i last pfx j children clast indent flatpaks orphans updates ans
         local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
 
         local executing=1
@@ -237,3 +237,5 @@
 }
 
 # ───────────────────────────────────────────────────────────────────────────────────────── << atlas() >> ───────────────────────────────────────────────────────────────────────────────────────── #
+
+PS1="\w ❯ "
