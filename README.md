@@ -1,4 +1,4 @@
-# sysview
+# atlas
 
 bash function for arch linux:
 
@@ -8,4 +8,4 @@ bash function for arch linux:
   
     view orphans and optionally remove them
   
-"sysview ?" for extra options
+"atlas ?" for extra options
