@@ -40,7 +40,7 @@
             } 2>/dev/null
 
             lpid=$!
-            echo -en "$hide_cur"
+            echo -en $hide_cur
             ptrap=$(trap -p 2)
             trap "atlas ex_loading; kill -2 $$" 2
         }
@@ -76,11 +76,11 @@
                 ')
             }
 
-            echo -e "${bold}system (${#system[@]})$reset"
+            echo -e $bold"system (${#system[@]})$reset"
 
             for i in ${!system[@]}
             do
-                pkg=${system[$i]}
+                pkg=${system[i]}
 
                 last=$(( i == ${#system[@]} - 1 ))
 
@@ -88,13 +88,13 @@
                     (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
                 }
 
-                echo -e "$pfx$pkg"
+                echo -e $pfx$pkg
 
                 children=(${system_dict[$pkg]})
 
                 for j in ${!children[@]}
                 do
-                    pkg=${children[$j]}
+                    pkg=${children[j]}
 
                     clast=$(( j == ${#children[@]} - 1 ))
 
@@ -113,13 +113,13 @@
         [[ $1 = ex_flatpaks ]] && {
             mapfile -t flatpaks < <(flatpak list --app --columns=name)
 
-            (( ${#flatpaks[@]} )) || return
+            [[ ${flatpaks[0]} ]] || return
 
-            echo -e "${bold}flatpaks (${#flatpaks[@]})$reset"
+            echo -e $bold"flatpaks (${#flatpaks[@]})$reset"
 
             for i in ${!flatpaks[@]}
             do
-                pkg=${flatpaks[$i]}
+                pkg=${flatpaks[i]}
 
                 last=$(( i == ${#flatpaks[@]} - 1 ))
 
@@ -127,7 +127,7 @@
                     (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
                 }
 
-                echo -e "$pfx$pkg"
+                echo -e $pfx$pkg
             done
 
             queue+=(ex_upgrade)
@@ -140,13 +140,13 @@
         [[ $1 = ex_orphans ]] && {
             mapfile -t orphans < <(pacman -Qqtd)
 
-            (( ${#orphans[@]} )) || return
+            (( orphans[0] )) || return
 
-            echo -e "$bold${red}orphans (${#orphans[@]})$reset"
+            echo -e $bold$red"orphans (${#orphans[@]})$reset"
 
             for i in ${!orphans[@]}
             do
-                pkg=${orphans[$i]}
+                pkg=${orphans[i]}
 
                 last=$(( i == ${#orphans[@]} - 1 ))
 
@@ -154,7 +154,7 @@
                     (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
                 }
 
-                echo -e "$red$pfx$pkg$reset"
+                echo -e $red$pfx$pkg$reset
             done
 
             queue+=(ex_cleanup)
@@ -179,9 +179,9 @@
                 mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
                 atlas ex_loading
 
-                (( ${#updates[@]} )) || return
+                (( updates[0] )) || return
 
-                echo -en "upgrade flatpaks? (y/${bold}n$reset) "
+                echo -en "upgrade flatpaks? (y/"$bold"n$reset) "
                 read ans
                 [[ ${ans,,} = y ]] && {
                     flatpak update ${updates[@]}
@@ -192,7 +192,7 @@
             }
 
             [[ $1 = ex_cleanup ]] && {
-                echo -en "uninstall orphans? (y/${bold}n$reset) "
+                echo -en "uninstall orphans? (y/"$bold"n$reset) "
                 read ans
                 [[ ${ans,,} = y ]] && sudo pacman -Rns ${orphans[@]}
 
@@ -227,9 +227,7 @@
         (( ${#queue[@]} )) || queue=(ex_intro ex_system ex_flatpaks ex_orphans)
 
         while (( index < ${#queue[@]} ))
-        do
-            atlas ${queue[$index]}
-            (( index++ ))
+        do atlas ${queue[index++]}
         done
 
     }
