@@ -22,7 +22,7 @@
             (( lpid )) && {
                 eval "${ptrap:-trap - 2}"
                 kill $lpid
-                wait $lpid &>/dev/null
+                wait $lpid 2>/dev/null
                 lpid=
                 echo -en "\e[K$show_cur"
                 return
@@ -185,7 +185,7 @@
                 read ans
                 [[ ${ans,,} = y ]] && {
                     flatpak update ${updates[@]}
-                    flatpak remove --unused -y &>/dev/null
+                    flatpak remove --unused -y
                 }
 
                 echo
