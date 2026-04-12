@@ -1,18 +1,18 @@
 # ─────────────────────────────────────────────────────────────────────────────────────────── \\  ▼  // ─────────────────────────────────────────────────────────────────────────────────────────── #
                                                                                                atlas()
 {
-
     (( executing )) && {
 
 # ────────────── help ─────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_help ]] && {
-            echo "usage:  atlas (s) (f) (o) (q)"
-            echo "  s  ➜  system packages"
-            echo "  f  ➜  flatpak apps"
-            echo "  o  ➜  orphan packages"
+            echo "usage:  atlas (q) (s) (f) (o) (u) (d)"
             echo "  q  ➜  quiet mode"
-
+            echo "  s  ➜  list system packages"
+            echo "  f  ➜  list flatpak apps"
+            echo "  o  ➜  list orphans"
+            echo "  u  ➜  update flatpaks"
+            echo "  d  ➜  delete orphans"
             echo
         }
 
@@ -22,9 +22,9 @@
             (( lpid )) && {
                 eval "${ptrap:-trap - 2}"
                 kill $lpid
-                wait $lpid 2>/dev/null
+                wait $lpid &>/dev/null
                 lpid=
-                echo -en "\e[K$show_cur"
+                echo -en "\r\e[K$show_cur"
                 return
             }
 
@@ -33,7 +33,7 @@
                 do
                     for c in "( / )" "( — )" "( \ )" "( | )"
                     do
-                        echo -en "$bold$c$reset $lmsg\r"
+                        echo -en "\r$bold$c$reset"
                         sleep 0.05
                     done
                 done &
@@ -48,18 +48,16 @@
 # ────────────── system ───────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_system ]] && {
-            mapfile -t system < <(comm -23 <(pacman -Qqtt | sort) <(pacman -Qqtd | sort))
-
-            local -A system_dict
+            mapfile -t system < <(comm -23 <(pacman -Qqtt) <(pacman -Qqtd))
 
             (( quiet )) || {
-                for pkg in ${system[@]}
-                do system_dict[$pkg]=
+                for pkg in ${system[*]}
+                do sysmap[$pkg]=
                 done
 
-                while read -r pkg dep
-                do [[ -v system_dict[$dep] ]] && system_dict[$pkg]+="$dep "
-                done < <(LC_ALL=C pacman -Qi ${system[@]} | awk '
+                while read pkg dep
+                do [[ -v sysmap[$dep] ]] && sysmap[$pkg]+="$dep "
+                done < <(LC_ALL=C pacman -Qi ${system[*]} | awk '
                     /^Name/ { pkg = $NF }
                     /^Optional Deps/ {
                         gsub(/^Optional Deps *: *|:.*/, "")
@@ -75,31 +73,111 @@
                     { opt_deps = 0 }
                 ')
             }
+        }
 
-            echo -e $bold"system (${#system[@]})$reset"
+# ────────────── flatpaks ─────────────────────────────────────────────────────────────────────── ●
 
-            for i in ${!system[@]}
+        [[ $1 = ex_flatpaks ]] && {
+            mapfile -t flatpaks < <(flatpak list --app --columns=name 2>/dev/null)
+        }
+
+# ────────────── orphans ──────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_orphans ]] && {
+            mapfile -t orphans < <(pacman -Qqtd)
+        }
+
+# ────────────── upgrade ──────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_upgrade ]] && {
+            mapfile -t updates < <(flatpak remote-ls --updates --columns=application 2>/dev/null)
+        }
+
+# ────────────── delete ───────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_delete ]] && {
+            mapfile -t orphans < <(pacman -Qqtd)
+        }
+
+# ────────────── view ─────────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_view ]] && {
+            for a in $args
             do
-                pkg=${system[i]}
-
-                last=$(( i == ${#system[@]} - 1 ))
-
-                (( quiet )) && pfx= || {
-                    (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
+                [[ $a = s ]] && {
+                    [[ ${system[0]} ]] && {
+                        echo -e "${bold}system (${#system[*]})$reset"
+                        local -n carr=system
+                        local -n cmap=sysmap
+                        atlas ex_render
+                    }
                 }
 
-                echo -e $pfx$pkg
+                [[ $a = f ]] && {
+                    [[ ${flatpaks[0]} ]] && {
+                        echo -e "${bold}flatpaks (${#flatpaks[*]})$reset"
+                        local -n carr=flatpaks
+                        local -n cmap=nilmap
+                        atlas ex_render
+                    }
+                }
 
-                children=(${system_dict[$pkg]})
+                [[ $a = o ]] && {
+                    [[ ${orphans[0]} ]] && {
+                        echo -e "$bold${red}orphans (${#orphans[*]})$reset"
+                        local -n carr=orphans
+                        local -n cmap=nilmap
+                        atlas ex_render
+                    }
+                }
 
-                for j in ${!children[@]}
+                [[ $a = u ]] && {
+                    [[ ${updates[0]} ]] && {
+                        echo -en "upgrade flatpaks? (y/${bold}n$reset) "
+                        read ans
+                        [[ ${ans,,} = y ]] && {
+                            flatpak update ${updates[*]}
+                            flatpak remove --unused -y &>/dev/null
+                        }
+                        echo
+                    }
+                }
+
+                [[ $a = d ]] && {
+                    [[ ${orphans[0]} ]] && {
+                        echo -en "delete orphans? (y/${bold}n$reset) "
+                        read ans
+                        [[ ${ans,,} = y ]] && sudo pacman -Rns ${orphans[*]}
+                        echo
+                    }
+                }
+            done
+        }
+
+# ────────────── render ───────────────────────────────────────────────────────────────────────── ●
+
+        [[ $1 = ex_render ]] && {
+            for i in ${!carr[*]}
+            do
+                pkg=${carr[i]}
+
+                last=$(( i == ${#carr[*]} - 1 ))
+
+                (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
+                (( quiet )) && pfx=
+
+                echo -e "$pfx$pkg"
+
+                children=(${cmap[$pkg]})
+
+                for ii in ${!children[*]}
                 do
-                    pkg=${children[j]}
+                    pkg=${children[ii]}
 
-                    clast=$(( j == ${#children[@]} - 1 ))
+                    lastc=$(( ii == ${#children[*]} - 1 ))
 
                     (( last )) && indent="   " || indent="│  "
-                    (( clast )) && pfx="└─ " || pfx="├─ "
+                    (( lastc )) && pfx="└─ " || pfx="├─ "
 
                     echo -e "$indent$dim$pfx$pkg$reset"
                 done
@@ -108,130 +186,59 @@
             echo
         }
 
-# ────────────── flatpaks ─────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_flatpaks ]] && {
-            mapfile -t flatpaks < <(flatpak list --app --columns=name)
-
-            [[ ${flatpaks[0]} ]] || return
-
-            echo -e $bold"flatpaks (${#flatpaks[@]})$reset"
-
-            for i in ${!flatpaks[@]}
-            do
-                pkg=${flatpaks[i]}
-
-                last=$(( i == ${#flatpaks[@]} - 1 ))
-
-                (( quiet )) && pfx= || {
-                    (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
-                }
-
-                echo -e $pfx$pkg
-            done
-
-            queue+=(ex_upgrade)
-
-            echo
-        }
-
-# ────────────── orphans ──────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_orphans ]] && {
-            mapfile -t orphans < <(pacman -Qqtd)
-
-            [[ ${orphans[0]} ]] || return
-
-            echo -e $bold$red"orphans (${#orphans[@]})$reset"
-
-            for i in ${!orphans[@]}
-            do
-                pkg=${orphans[i]}
-
-                last=$(( i == ${#orphans[@]} - 1 ))
-
-                (( quiet )) && pfx= || {
-                    (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
-                }
-
-                echo -e $red$pfx$pkg$reset
-            done
-
-            queue+=(ex_cleanup)
-
-            echo
-        }
-
-# ────────────── extra ────────────────────────────────────────────────────────────────────────── ●
-
-        (( quiet )) || {
-
-            [[ $1 = ex_intro ]] && {
-                lmsg="${dim}atlas: executing$reset"
-                atlas ex_loading
-                sleep 1
-                atlas ex_loading
-            }
-
-            [[ $1 = ex_upgrade ]] && {
-                lmsg="${dim}checking updates$reset"
-                atlas ex_loading
-                mapfile -t updates < <(flatpak remote-ls --updates --columns=application)
-                atlas ex_loading
-
-                [[ ${updates[0]} ]] || return
-
-                echo -en "upgrade flatpaks? (y/"$bold"n$reset) "
-                read ans
-                [[ ${ans,,} = y ]] && {
-                    flatpak update ${updates[@]}
-                    flatpak remove --unused -y
-                }
-
-                echo
-            }
-
-            [[ $1 = ex_cleanup ]] && {
-                echo -en "uninstall orphans? (y/"$bold"n$reset) "
-                read ans
-                [[ ${ans,,} = y ]] && sudo pacman -Rns ${orphans[@]}
-
-                echo
-            }
-
-        }
-
 # ────────────── execution ────────────────────────────────────────────────────────────────────── ●
 
     :;} || {
-
-        local quiet lpid ptrap lmsg system pkg dep i last pfx j children clast indent flatpaks orphans updates ans
+        local a ans args carr cmap children dep flatpaks i ii indent last lastc lpid orphans pfx pkg ptrap quiet system updates
+        local -A sysmap nilmap
         local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
 
         local executing=1
         echo
 
-        local arg queue index
-
-        for arg
+        for a
         do
-            case $arg in
-                s) [[ ${queue[@]} = *ex_system* ]] || queue+=(ex_system) ;;
-                f) [[ ${queue[@]} = *ex_flatpaks* ]] || queue+=(ex_flatpaks) ;;
-                o) [[ ${queue[@]} = *ex_orphans* ]] || queue+=(ex_orphans) ;;
-                q) quiet=1 ;;
-                *) atlas ex_help; return ;;
-            esac
+            [[ $a = [sfoudq] ]] || {
+                atlas ex_help
+                return
+            }
         done
 
-        (( ${#queue[@]} )) || queue=(ex_intro ex_system ex_flatpaks ex_orphans)
+        [[ $* = *q* ]] && quiet=1
+        [[ $* = *[sfoud]* ]] || set s f o u d
 
-        while (( index < ${#queue[@]} ))
-        do atlas ${queue[index++]}
-        done
+        atlas ex_loading
 
+        [[ $* = *s* ]] && {
+            echo -en "\e[7G${dim}atlas: executing system$reset"
+            atlas ex_system
+        }
+
+        [[ $* = *f* ]] && {
+            echo -en "\e[7G${dim}atlas: executing flatpaks$reset\e[K"
+            atlas ex_flatpaks
+        }
+
+        [[ $* = *o* ]] && {
+            echo -en "\e[7G${dim}atlas: executing orphans$reset\e[K"
+            atlas ex_orphans
+        }
+
+        [[ $* = *u* ]] && {
+            echo -en "\e[7G${dim}atlas: executing upgrade$reset\e[K"
+            atlas ex_upgrade
+        }
+
+        [[ $* = *d* ]] && {
+            echo -en "\e[7G${dim}atlas: executing delete$reset\e[K"
+            atlas ex_delete
+        }
+
+        atlas ex_loading
+
+        args=$*
+        atlas ex_view
     }
-
 }
 
 # ───────────────────────────────────────────────────────────────────────────────────────── << atlas() >> ───────────────────────────────────────────────────────────────────────────────────────── #
