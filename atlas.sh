@@ -5,7 +5,7 @@
 
 # ────────────── help ─────────────────────────────────────────────────────────────────────────── ●
 
-        [[ $1 = ex_help ]] && {
+        [[ $1 = ex_invalid ]] && {
             echo "usage:  atlas (q) (c) (f) (w) (u) (d)"
             echo "  q  ➜  quiet mode"
             echo "  c  ➜  list core packages"
@@ -31,9 +31,9 @@
             {
                 while :
                 do
-                    for c in "( / )" "( — )" "( \ )" "( | )"
+                    for f in "( / )" "( — )" "( \ )" "( | )"
                     do
-                        echo -en "\r$bold$c$r"
+                        echo -en "\r$bold$f$r"
                         sleep 0.05
                     done
                 done &
@@ -48,15 +48,11 @@
 # ────────────── core ─────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_core ]] && {
-            mapfile -t core < <(comm -23 <(pacman -Qqtt) <(pacman -Qqtd))
+            core=( $(grep -vxf <(pacman -Qqtd) <(pacman -Qqtt)) )
 
             (( quiet )) || {
-                for pkg in ${core[*]}
-                do sysmap[$pkg]=
-                done
-
                 while read pkg dep
-                do [[ -v sysmap[$dep] ]] && sysmap[$pkg]+="$dep "
+                do [[ " ${core[*]} " =~ " $dep " ]] && sysmap[$pkg]+="$dep "
                 done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
                     /^Name/ { pkg = $NF }
                     /^Optional Deps/ {
@@ -84,74 +80,71 @@
 # ────────────── waste ────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_waste ]] && {
-            mapfile -t waste < <(pacman -Qqtd)
+            waste=( $(pacman -Qqtd) )
         }
 
 # ────────────── upgrade ──────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_upgrade ]] && {
-            mapfile -t delta < <(flatpak remote-ls --updates --columns=application 2>/dev/null)
+            delta=( $(flatpak remote-ls --updates --columns=application 2>/dev/null) )
         }
 
 # ────────────── delete ───────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_delete ]] && {
-            mapfile -t waste < <(pacman -Qqtd)
+            waste=( $(pacman -Qqtd) )
         }
 
 # ────────────── view ─────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_view ]] && {
-            for a in $ops
-            do
-                [[ $a = c ]] && {
-                    [[ ${core[0]} ]] && {
-                        echo -e "${bold}core (${#core[*]})$r"
-                        local -n carr=core
-                        local -n cmap=sysmap
-                        atlas ex_render
-                    }
-                }
+            [[ $ops =~ c ]] && {
+                echo -e "${bold}core (${#core[*]})$r"
+                local -n carr=core
+                local -n cmap=sysmap
+                atlas ex_render
+            }
 
-                [[ $a = f ]] && {
-                    [[ ${flatpaks[0]} ]] && {
-                        echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
-                        local -n carr=flatpaks
-                        local -n cmap=nilmap
-                        atlas ex_render
-                    }
+            [[ $ops =~ f ]] && {
+                [[ $flatpaks ]] && {
+                    echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
+                    local -n carr=flatpaks
+                    local -n cmap=nilmap
+                    atlas ex_render
                 }
+            }
 
-                [[ $a = w ]] && {
-                    [[ ${waste[0]} ]] && {
-                        echo -e "$bold${red}waste (${#waste[*]})$r"
-                        local -n carr=waste
-                        local -n cmap=nilmap
-                        atlas ex_render
-                    }
+            [[ $ops =~ w ]] && {
+                [[ $waste ]] && {
+                    echo -e "$bold${red}waste (${#waste[*]})$r"
+                    local -n carr=waste
+                    local -n cmap=nilmap
+                    color=$red
+                    atlas ex_render
+                    color=
                 }
+            }
 
-                [[ $a = u ]] && {
-                    [[ ${delta[0]} ]] && {
-                        echo -en "upgrade flatpaks? (y/${bold}n$r) "
-                        read intent
-                        [[ ${intent,,} = y ]] && {
-                            flatpak update ${delta[*]}
-                            flatpak remove --unused -y &>/dev/null
-                        }
-                        echo
+            [[ $ops =~ u ]] && {
+                [[ $delta ]] && {
+                    echo -en "upgrade flatpaks? (y/${bold}n$r) "
+                    read intent
+                    [[ ${intent,,} = y ]] && {
+                        flatpak update ${delta[*]}
+                        flatpak remove --unused -y &>/dev/null
                     }
+                    echo
                 }
+            }
 
-                [[ $a = d ]] && {
-                    [[ ${waste[0]} ]] && {
-                        echo -en "delete waste? (y/${bold}n$r) "
-                        read intent
-                        [[ ${intent,,} = y ]] && sudo pacman -Rns ${waste[*]}
-                        echo
-                    }
+            [[ $ops =~ d ]] && {
+                [[ $waste ]] && {
+                    echo -en "delete waste? (y/${bold}n$r) "
+                    read intent
+                    [[ ${intent,,} = y ]] && sudo pacman -Rns ${waste[*]}
+                    echo
                 }
-            done
+            }
         }
 
 # ────────────── render ───────────────────────────────────────────────────────────────────────── ●
@@ -166,9 +159,9 @@
                 (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
                 (( quiet )) && pfx=
 
-                echo -e "$pfx$pkg"
+                echo -e "$color$pfx$pkg$r"
 
-                children=(${cmap[$pkg]})
+                children=( ${cmap[$pkg]} )
 
                 for ii in ${!children[*]}
                 do
@@ -179,7 +172,7 @@
                     (( last )) && indent="   " || indent="│  "
                     (( lastc )) && pfx="└─ " || pfx="├─ "
 
-                    echo -e "$indent$dim$pfx$pkg$r"
+                    echo -e "$color$indent$dim$pfx$pkg$r"
                 done
             done
 
@@ -189,47 +182,44 @@
 # ────────────── execution ────────────────────────────────────────────────────────────────────── ●
 
     :;} || {
-        local a quiet tracer psig core pkg dep flatpaks waste delta ops carr cmap intent i last pfx children ii lastc indent
+        local quiet tracer psig core pkg dep flatpaks waste delta ops color intent i last pfx children ii lastc indent
         local -A sysmap nilmap
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
 
         local executing=1
         echo
 
-        for a
-        do
-            [[ $a = [cfwudq] ]] || {
-                atlas ex_help
-                return
-            }
-        done
+        [[ $* =~ [^cfwudq\ ] ]] && {
+            atlas ex_invalid
+            return
+        }
 
-        [[ $* = *q* ]] && quiet=1
-        [[ $* = *[cfwud]* ]] || set c f w u d
+        [[ $* =~ q ]] && quiet=1
+        [[ $* =~ [cfwud] ]] || set c f w u d
 
         atlas ex_loading
 
-        [[ $* = *c* ]] && {
+        [[ $* =~ c ]] && {
             echo -en "$origin${dim}atlas: executing core$r"
             atlas ex_core
         }
 
-        [[ $* = *f* ]] && {
+        [[ $* =~ f ]] && {
             echo -en "$origin${dim}atlas: executing flatpaks$r\e[K"
             atlas ex_flatpaks
         }
 
-        [[ $* = *w* ]] && {
+        [[ $* =~ w ]] && {
             echo -en "$origin${dim}atlas: executing waste$r\e[K"
             atlas ex_waste
         }
 
-        [[ $* = *u* ]] && {
+        [[ $* =~ u ]] && {
             echo -en "$origin${dim}atlas: executing upgrade$r\e[K"
             atlas ex_upgrade
         }
 
-        [[ $* = *d* ]] && {
+        [[ $* =~ d ]] && {
             echo -en "$origin${dim}atlas: executing delete$r\e[K"
             atlas ex_delete
         }
