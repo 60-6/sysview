@@ -24,7 +24,7 @@
                 kill $lpid
                 wait $lpid &>/dev/null
                 lpid=
-                echo -en "\r\e[K$show_cur"
+                echo -en "\r\e[K$scur"
                 return
             }
 
@@ -40,7 +40,7 @@
             } 2>/dev/null
 
             lpid=$!
-            echo -en $hide_cur
+            echo -en "$hcur"
             ptrap=$(trap -p 2)
             trap "atlas ex_loading; kill -2 $$" 2
         }
@@ -191,7 +191,7 @@
     :;} || {
         local a ans args carr cmap children dep flatpaks i ii indent last lastc lpid orphans pfx pkg ptrap quiet system updates
         local -A sysmap nilmap
-        local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hide_cur="\e[?25l" show_cur="\e[?25h"
+        local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hcur="\e[?25l" scur="\e[?25h" loffset="\e[7G"
 
         local executing=1
         echo
@@ -210,27 +210,27 @@
         atlas ex_loading
 
         [[ $* = *s* ]] && {
-            echo -en "\e[7G${dim}atlas: executing system$reset"
+            echo -en "$loffset${dim}atlas: executing system$reset"
             atlas ex_system
         }
 
         [[ $* = *f* ]] && {
-            echo -en "\e[7G${dim}atlas: executing flatpaks$reset\e[K"
+            echo -en "$loffset${dim}atlas: executing flatpaks$reset\e[K"
             atlas ex_flatpaks
         }
 
         [[ $* = *o* ]] && {
-            echo -en "\e[7G${dim}atlas: executing orphans$reset\e[K"
+            echo -en "$loffset${dim}atlas: executing orphans$reset\e[K"
             atlas ex_orphans
         }
 
         [[ $* = *u* ]] && {
-            echo -en "\e[7G${dim}atlas: executing upgrade$reset\e[K"
+            echo -en "$loffset${dim}atlas: executing upgrade$reset\e[K"
             atlas ex_upgrade
         }
 
         [[ $* = *d* ]] && {
-            echo -en "\e[7G${dim}atlas: executing delete$reset\e[K"
+            echo -en "$loffset${dim}atlas: executing delete$reset\e[K"
             atlas ex_delete
         }
 
