@@ -6,25 +6,25 @@
 # ────────────── help ─────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_help ]] && {
-            echo "usage:  atlas (q) (s) (f) (o) (u) (d)"
+            echo "usage:  atlas (q) (c) (f) (w) (u) (d)"
             echo "  q  ➜  quiet mode"
-            echo "  s  ➜  list system packages"
+            echo "  c  ➜  list core packages"
             echo "  f  ➜  list flatpak apps"
-            echo "  o  ➜  list orphans"
+            echo "  w  ➜  list waste"
             echo "  u  ➜  update flatpaks"
-            echo "  d  ➜  delete orphans"
+            echo "  d  ➜  delete waste"
             echo
         }
 
 # ────────────── loading ──────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_loading ]] && {
-            (( lpid )) && {
-                eval "${ptrap:-trap - 2}"
-                kill $lpid
-                wait $lpid &>/dev/null
-                lpid=
-                echo -en "\r\e[K$scur"
+            (( tracer )) && {
+                eval "${psig:-trap - 2}"
+                kill $tracer
+                wait $tracer &>/dev/null
+                tracer=
+                echo -en "\r\e[K$sc"
                 return
             }
 
@@ -39,25 +39,25 @@
                 done &
             } 2>/dev/null
 
-            lpid=$!
-            echo -en "$hcur"
-            ptrap=$(trap -p 2)
+            tracer=$!
+            echo -en "$hc"
+            psig=$(trap -p 2)
             trap "atlas ex_loading; kill -2 $$" 2
         }
 
-# ────────────── system ───────────────────────────────────────────────────────────────────────── ●
+# ────────────── core ─────────────────────────────────────────────────────────────────────────── ●
 
-        [[ $1 = ex_system ]] && {
-            mapfile -t system < <(comm -23 <(pacman -Qqtt) <(pacman -Qqtd))
+        [[ $1 = ex_core ]] && {
+            mapfile -t core < <(comm -23 <(pacman -Qqtt) <(pacman -Qqtd))
 
             (( quiet )) || {
-                for pkg in ${system[*]}
+                for pkg in ${core[*]}
                 do sysmap[$pkg]=
                 done
 
                 while read pkg dep
                 do [[ -v sysmap[$dep] ]] && sysmap[$pkg]+="$dep "
-                done < <(LC_ALL=C pacman -Qi ${system[*]} | awk '
+                done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
                     /^Name/ { pkg = $NF }
                     /^Optional Deps/ {
                         gsub(/^Optional Deps *: *|:.*/, "")
@@ -81,33 +81,33 @@
             mapfile -t flatpaks < <(flatpak list --app --columns=name 2>/dev/null)
         }
 
-# ────────────── orphans ──────────────────────────────────────────────────────────────────────── ●
+# ────────────── waste ────────────────────────────────────────────────────────────────────────── ●
 
-        [[ $1 = ex_orphans ]] && {
-            mapfile -t orphans < <(pacman -Qqtd)
+        [[ $1 = ex_waste ]] && {
+            mapfile -t waste < <(pacman -Qqtd)
         }
 
 # ────────────── upgrade ──────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_upgrade ]] && {
-            mapfile -t updates < <(flatpak remote-ls --updates --columns=application 2>/dev/null)
+            mapfile -t delta < <(flatpak remote-ls --updates --columns=application 2>/dev/null)
         }
 
 # ────────────── delete ───────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_delete ]] && {
-            mapfile -t orphans < <(pacman -Qqtd)
+            mapfile -t waste < <(pacman -Qqtd)
         }
 
 # ────────────── view ─────────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_view ]] && {
-            for a in $args
+            for a in $ops
             do
-                [[ $a = s ]] && {
-                    [[ ${system[0]} ]] && {
-                        echo -e "${bold}system (${#system[*]})$reset"
-                        local -n carr=system
+                [[ $a = c ]] && {
+                    [[ ${core[0]} ]] && {
+                        echo -e "${bold}core (${#core[*]})$reset"
+                        local -n carr=core
                         local -n cmap=sysmap
                         atlas ex_render
                     }
@@ -122,21 +122,21 @@
                     }
                 }
 
-                [[ $a = o ]] && {
-                    [[ ${orphans[0]} ]] && {
-                        echo -e "$bold${red}orphans (${#orphans[*]})$reset"
-                        local -n carr=orphans
+                [[ $a = w ]] && {
+                    [[ ${waste[0]} ]] && {
+                        echo -e "$bold${red}waste (${#waste[*]})$reset"
+                        local -n carr=waste
                         local -n cmap=nilmap
                         atlas ex_render
                     }
                 }
 
                 [[ $a = u ]] && {
-                    [[ ${updates[0]} ]] && {
+                    [[ ${delta[0]} ]] && {
                         echo -en "upgrade flatpaks? (y/${bold}n$reset) "
-                        read ans
-                        [[ ${ans,,} = y ]] && {
-                            flatpak update ${updates[*]}
+                        read intent
+                        [[ ${intent,,} = y ]] && {
+                            flatpak update ${delta[*]}
                             flatpak remove --unused -y &>/dev/null
                         }
                         echo
@@ -144,10 +144,10 @@
                 }
 
                 [[ $a = d ]] && {
-                    [[ ${orphans[0]} ]] && {
-                        echo -en "delete orphans? (y/${bold}n$reset) "
-                        read ans
-                        [[ ${ans,,} = y ]] && sudo pacman -Rns ${orphans[*]}
+                    [[ ${waste[0]} ]] && {
+                        echo -en "delete waste? (y/${bold}n$reset) "
+                        read intent
+                        [[ ${intent,,} = y ]] && sudo pacman -Rns ${waste[*]}
                         echo
                     }
                 }
@@ -189,54 +189,54 @@
 # ────────────── execution ────────────────────────────────────────────────────────────────────── ●
 
     :;} || {
-        local a ans args carr cmap children dep flatpaks i ii indent last lastc lpid orphans pfx pkg ptrap quiet system updates
+        local a quiet tracer psig core pkg dep flatpaks waste delta ops carr cmap intent i last pfx children ii lastc indent
         local -A sysmap nilmap
-        local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hcur="\e[?25l" scur="\e[?25h" loffset="\e[7G"
+        local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
 
         local executing=1
         echo
 
         for a
         do
-            [[ $a = [sfoudq] ]] || {
+            [[ $a = [cfwudq] ]] || {
                 atlas ex_help
                 return
             }
         done
 
         [[ $* = *q* ]] && quiet=1
-        [[ $* = *[sfoud]* ]] || set s f o u d
+        [[ $* = *[cfwud]* ]] || set c f w u d
 
         atlas ex_loading
 
-        [[ $* = *s* ]] && {
-            echo -en "$loffset${dim}atlas: executing system$reset"
-            atlas ex_system
+        [[ $* = *c* ]] && {
+            echo -en "$origin${dim}atlas: executing core$reset"
+            atlas ex_core
         }
 
         [[ $* = *f* ]] && {
-            echo -en "$loffset${dim}atlas: executing flatpaks$reset\e[K"
+            echo -en "$origin${dim}atlas: executing flatpaks$reset\e[K"
             atlas ex_flatpaks
         }
 
-        [[ $* = *o* ]] && {
-            echo -en "$loffset${dim}atlas: executing orphans$reset\e[K"
-            atlas ex_orphans
+        [[ $* = *w* ]] && {
+            echo -en "$origin${dim}atlas: executing waste$reset\e[K"
+            atlas ex_waste
         }
 
         [[ $* = *u* ]] && {
-            echo -en "$loffset${dim}atlas: executing upgrade$reset\e[K"
+            echo -en "$origin${dim}atlas: executing upgrade$reset\e[K"
             atlas ex_upgrade
         }
 
         [[ $* = *d* ]] && {
-            echo -en "$loffset${dim}atlas: executing delete$reset\e[K"
+            echo -en "$origin${dim}atlas: executing delete$reset\e[K"
             atlas ex_delete
         }
 
         atlas ex_loading
 
-        args=$*
+        ops=$*
         atlas ex_view
     }
 }
