@@ -56,15 +56,15 @@
                 /^Optional Deps/ {
                     gsub(/^Optional Deps *: *|:.*/, "")
                     print pkg, $0
-                    c = 1
+                    proceed = 1
                     next
                 }
-                c && /^ / {
+                proceed && /^ / {
                     gsub(/^ +|:.*/, "")
                     print pkg, $0
                     next
                 }
-                { c = 0 }
+                { proceed = 0 }
             ')
         }
 
