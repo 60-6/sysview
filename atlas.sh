@@ -33,7 +33,7 @@
                 do
                     for c in "( / )" "( — )" "( \ )" "( | )"
                     do
-                        echo -en "\r$bold$c$reset"
+                        echo -en "\r$bold$c$r"
                         sleep 0.05
                     done
                 done &
@@ -106,7 +106,7 @@
             do
                 [[ $a = c ]] && {
                     [[ ${core[0]} ]] && {
-                        echo -e "${bold}core (${#core[*]})$reset"
+                        echo -e "${bold}core (${#core[*]})$r"
                         local -n carr=core
                         local -n cmap=sysmap
                         atlas ex_render
@@ -115,7 +115,7 @@
 
                 [[ $a = f ]] && {
                     [[ ${flatpaks[0]} ]] && {
-                        echo -e "${bold}flatpaks (${#flatpaks[*]})$reset"
+                        echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
                         local -n carr=flatpaks
                         local -n cmap=nilmap
                         atlas ex_render
@@ -124,7 +124,7 @@
 
                 [[ $a = w ]] && {
                     [[ ${waste[0]} ]] && {
-                        echo -e "$bold${red}waste (${#waste[*]})$reset"
+                        echo -e "$bold${red}waste (${#waste[*]})$r"
                         local -n carr=waste
                         local -n cmap=nilmap
                         atlas ex_render
@@ -133,7 +133,7 @@
 
                 [[ $a = u ]] && {
                     [[ ${delta[0]} ]] && {
-                        echo -en "upgrade flatpaks? (y/${bold}n$reset) "
+                        echo -en "upgrade flatpaks? (y/${bold}n$r) "
                         read intent
                         [[ ${intent,,} = y ]] && {
                             flatpak update ${delta[*]}
@@ -145,7 +145,7 @@
 
                 [[ $a = d ]] && {
                     [[ ${waste[0]} ]] && {
-                        echo -en "delete waste? (y/${bold}n$reset) "
+                        echo -en "delete waste? (y/${bold}n$r) "
                         read intent
                         [[ ${intent,,} = y ]] && sudo pacman -Rns ${waste[*]}
                         echo
@@ -179,7 +179,7 @@
                     (( last )) && indent="   " || indent="│  "
                     (( lastc )) && pfx="└─ " || pfx="├─ "
 
-                    echo -e "$indent$dim$pfx$pkg$reset"
+                    echo -e "$indent$dim$pfx$pkg$r"
                 done
             done
 
@@ -191,7 +191,7 @@
     :;} || {
         local a quiet tracer psig core pkg dep flatpaks waste delta ops carr cmap intent i last pfx children ii lastc indent
         local -A sysmap nilmap
-        local bold="\e[1m" dim="\e[2m" red="\e[31m" reset="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
+        local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
 
         local executing=1
         echo
@@ -210,27 +210,27 @@
         atlas ex_loading
 
         [[ $* = *c* ]] && {
-            echo -en "$origin${dim}atlas: executing core$reset"
+            echo -en "$origin${dim}atlas: executing core$r"
             atlas ex_core
         }
 
         [[ $* = *f* ]] && {
-            echo -en "$origin${dim}atlas: executing flatpaks$reset\e[K"
+            echo -en "$origin${dim}atlas: executing flatpaks$r\e[K"
             atlas ex_flatpaks
         }
 
         [[ $* = *w* ]] && {
-            echo -en "$origin${dim}atlas: executing waste$reset\e[K"
+            echo -en "$origin${dim}atlas: executing waste$r\e[K"
             atlas ex_waste
         }
 
         [[ $* = *u* ]] && {
-            echo -en "$origin${dim}atlas: executing upgrade$reset\e[K"
+            echo -en "$origin${dim}atlas: executing upgrade$r\e[K"
             atlas ex_upgrade
         }
 
         [[ $* = *d* ]] && {
-            echo -en "$origin${dim}atlas: executing delete$reset\e[K"
+            echo -en "$origin${dim}atlas: executing delete$r\e[K"
             atlas ex_delete
         }
 
