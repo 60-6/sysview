@@ -21,7 +21,7 @@
 
         [[ $1 = ex_tracer ]] && {
             (( tracer )) && {
-                eval "${osig:-trap - 2}"
+                eval "${sig:-trap - 2}"
                 kill $tracer
                 wait $tracer 2>/dev/null
                 tracer=
@@ -42,69 +42,47 @@
 
             tracer=$!
             echo -en "$hc"
-            osig=$(trap -p 2)
+            sig=$(trap -p 2)
             trap "atlas ex_tracer; kill -2 $$" 2
         }
 
-# ────────────── core ─────────────────────────────────────────────────────────────────────────── ●
+# ────────────── cmap ─────────────────────────────────────────────────────────────────────────── ●
 
-        [[ $1 = ex_core ]] && {
-            core=( $(grep -vxf <(pacman -Qqtd) <(pacman -Qqtt)) )
-
-            (( quiet )) || {
-                while read pkg dep
-                do [[ " ${core[*]} " =~ " $dep " ]] && sysmap[$pkg]+="$dep "
-                done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
-                    /^Name/ { pkg = $NF }
-                    /^Optional Deps/ {
-                        gsub(/^Optional Deps *: *|:.*/, "")
-                        print pkg, $0
-                        opt_deps = 1
-                        next
-                    }
-                    opt_deps && /^ / {
-                        gsub(/^ +|:.*/, "")
-                        print pkg, $0
-                        next
-                    }
-                    { opt_deps = 0 }
-                ')
-            }
-        }
-
-# ────────────── flatpaks ─────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_flatpaks ]] && {
-            mapfile -t flatpaks < <(flatpak list --app --columns=name 2>/dev/null)
-        }
-
-# ────────────── orphans ──────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_orphans ]] && {
-            orphans=( $(pacman -Qqtd) )
-        }
-
-# ────────────── updates ──────────────────────────────────────────────────────────────────────── ●
-
-        [[ $1 = ex_updates ]] && {
-            updates=( $(flatpak remote-ls --updates --columns=application 2>/dev/null) )
+        [[ $1 = ex_cmap ]] && {
+            while read pkg dep
+            do [[ " ${core[*]} " =~ " $dep " ]] && cmap[$pkg]+="$dep "
+            done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
+                /^Name/ { pkg = $NF }
+                /^Optional Deps/ {
+                    gsub(/^Optional Deps *: *|:.*/, "")
+                    print pkg, $0
+                    c = 1
+                    next
+                }
+                c && /^ / {
+                    gsub(/^ +|:.*/, "")
+                    print pkg, $0
+                    next
+                }
+                { c = 0 }
+            ')
         }
 
 # ────────────── render ───────────────────────────────────────────────────────────────────────── ●
 
         [[ $1 = ex_render ]] && {
-            for i in ${!carr[*]}
+            for i in ${!arr[*]}
             do
-                pkg=${carr[i]}
+                pkg=${arr[i]}
 
-                last=$(( i == ${#carr[*]} - 1 ))
+                last=$(( i == ${#arr[*]} - 1 ))
 
                 (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
                 (( quiet )) && pfx=
 
                 echo -e "$color$pfx$pkg$r"
 
-                children=( ${cmap[$pkg]} )
+                children=( ${map[$pkg]} )
 
                 for ii in ${!children[*]}
                 do
@@ -133,22 +111,23 @@
 
             [[ $ops =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r"
-                atlas ex_core
+                core=( $(grep -vxf <(pacman -Qqtd) <(pacman -Qqtt)) )
+                (( quiet )) || atlas ex_cmap
             }
 
             [[ $ops =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
-                atlas ex_flatpaks
+                mapfile -t flatpaks < <(flatpak list --app --columns=name 2>/dev/null)
             }
 
             [[ $ops =~ [od] ]] && {
                 echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
-                atlas ex_orphans
+                orphans=( $(pacman -Qqtd) )
             }
 
             [[ $ops =~ u ]] && {
                 echo -en "$origin${dim}atlas: scanning updates$r\e[K"
-                atlas ex_updates
+                updates=( $(flatpak remote-ls --updates --columns=application 2>/dev/null) )
             }
 
             atlas ex_tracer
@@ -159,23 +138,23 @@
         [[ $1 = ex_interface ]] && {
             [[ $core ]] && {
                 echo -e "${bold}core (${#core[*]})$r"
-                local -n carr=core
-                local -n cmap=sysmap
+                local -n arr=core
+                local -n map=cmap
                 atlas ex_render
             }
 
             [[ $flatpaks ]] && {
                 echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
-                local -n carr=flatpaks
-                local -n cmap=nilmap
+                local -n arr=flatpaks
+                local -n map=nilmap
                 atlas ex_render
             }
 
             [[ $orphans ]] && {
                 [[ $ops =~ o ]] && {
                     echo -e "$bold${red}orphans (${#orphans[*]})$r"
-                    local -n carr=orphans
-                    local -n cmap=nilmap
+                    local -n arr=orphans
+                    local -n map=nilmap
                     color=$red
                     atlas ex_render
                     color=
@@ -203,8 +182,8 @@
 # ────────────── execution ────────────────────────────────────────────────────────────────────── ●
 
     :;} || {
-        local tracer osig core quiet pkg dep flatpaks orphans updates i last pfx color children ii lastc indent intent
-        local -A sysmap nilmap
+        local tracer sig core quiet pkg dep flatpaks orphans updates i last pfx color children ii lastc indent intent
+        local -A cmap nilmap
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
 
         local executing=1
