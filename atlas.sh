@@ -13,7 +13,6 @@
             echo "  o  ➜  view orphans"
             echo "  d  ➜  delete orphans"
             echo "  u  ➜  update flatpaks"
-            echo
             kill -2 $$
         }
 
