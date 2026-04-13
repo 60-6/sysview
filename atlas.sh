@@ -147,7 +147,7 @@
             }
 
             [[ $ops =~ u ]] && {
-                echo -en "$origin${dim}atlas: scanning upgrade$r\e[K"
+                echo -en "$origin${dim}atlas: scanning updates$r\e[K"
                 atlas ex_updates
             }
 
