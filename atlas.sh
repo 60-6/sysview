@@ -8,7 +8,7 @@
         local executing=1
         echo
 
-        local tracer sig core quiet pkg dep flatpaks orphans updates i last pfx color children ii lastc indent intent
+        local tracer sig core quiet pkg opt flatpaks orphans updates i last pfx color children ii lastc indent intent
         local -A cmap nilmap
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
 
@@ -94,8 +94,8 @@
 # ────────────── cmap ─────────────────────────────────────────────────────────────────────────── ●
 
     [[ $1 = ex_cmap ]] && {
-        while read pkg dep
-        do [[ " ${core[*]} " =~ " $dep " ]] && cmap[$pkg]+="$dep "
+        while read pkg opt
+        do [[ " ${core[*]} " =~ " $opt " ]] && cmap[$pkg]+="$opt "
         done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
             proceed {
                 if (/^ /) {
