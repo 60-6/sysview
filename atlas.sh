@@ -77,9 +77,9 @@
         {
             while :
             do
-                for f in "( / )" "( — )" "( \ )" "( | )"
+                for f in '/' '—' '\' '|'
                 do
-                    echo -en "\r$bold$f$r"
+                    echo -en "\r$bold( $f )$r"
                     sleep 0.05
                 done
             done &
