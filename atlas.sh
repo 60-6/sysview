@@ -2,56 +2,58 @@
                                                                                                atlas()
 {
 
-# ────────────── execution ────────────────────────────────────────────────────────────────────── ●
+# ────────────── execute ──────────────────────────────────────────────────────────────────────── ●
 
     (( executing )) || {
         local executing=1
         echo
 
-        local tracer sig core quiet pkg opt flatpaks orphans updates i last pfx color children ii lastc indent intent
-        local -A cmap nilmap
+        local pulse sig core quiet pkg opt flatpaks orphans updates i last pfx attr children ii lastc indent intent
+        local -A clineage null
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
 
-        atlas ex_scan
-        atlas ex_interface
+        atlas _scan
+        atlas _resolve
     }
 
 # ────────────── scan ─────────────────────────────────────────────────────────────────────────── ●
 
-    [[ $1 = ex_scan ]] && {
-        [[ $ops =~ [^qcfoud\ ] ]] && atlas ex_error
+    [[ $1 = _scan ]] && {
+        [[ $ops =~ [^qcfoud\ ] ]] && atlas _error
         [[ $ops =~ q ]] && quiet=1
         [[ $ops =~ [cfoud] ]] || ops=cfoud
 
-        atlas ex_tracer
+        {
+            atlas _pulse
 
-        [[ $ops =~ c ]] && {
-            echo -en "$origin${dim}atlas: scanning core$r"
-            core=( $(grep -vxf <(pacman -Qqtd) <(pacman -Qqtt)) )
-            (( quiet )) || atlas ex_cmap
-        }
+            [[ $ops =~ c ]] && {
+                echo -en "$origin${dim}atlas: scanning core$r"
+                core=( $(grep -vxf <(pacman -Qqtd) <(pacman -Qqtt)) )
+                (( quiet )) || atlas _extract
+            }
 
-        [[ $ops =~ f ]] && {
-            echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
-            mapfile -t flatpaks < <(flatpak list --app --columns=name 2>/dev/null)
-        }
+            [[ $ops =~ f ]] && {
+                echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
+                mapfile -t flatpaks < <(flatpak list --app --columns=name)
+            }
 
-        [[ $ops =~ [od] ]] && {
-            echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
-            orphans=( $(pacman -Qqtd) )
-        }
+            [[ $ops =~ [od] ]] && {
+                echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
+                orphans=( $(pacman -Qqtd) )
+            }
 
-        [[ $ops =~ u ]] && {
-            echo -en "$origin${dim}atlas: scanning updates$r\e[K"
-            updates=( $(flatpak remote-ls --updates --columns=application 2>/dev/null) )
-        }
+            [[ $ops =~ u ]] && {
+                echo -en "$origin${dim}atlas: scanning updates$r\e[K"
+                updates=( $(flatpak remote-ls --updates --columns=application) )
+            }
 
-        atlas ex_tracer
+            atlas _pulse
+        } 2>/dev/null
     }
 
 # ────────────── error ────────────────────────────────────────────────────────────────────────── ●
 
-    [[ $1 = ex_error ]] && {
+    [[ $1 = _error ]] && {
         echo "usage:  atlas (q) (c) (f) (o) (d) (u)"
         echo "  q  ➜  quiet mode"
         echo "  c  ➜  view core packages"
@@ -62,40 +64,45 @@
         kill -2 $$
     }
 
-# ────────────── tracer ───────────────────────────────────────────────────────────────────────── ●
+# ────────────── pulse ────────────────────────────────────────────────────────────────────────── ●
 
-    [[ $1 = ex_tracer ]] && {
-        (( tracer )) && {
+    [[ $1 = _pulse ]] && {
+        (( pulse )) && {
             eval "${sig:-trap - 2}"
-            kill $tracer
-            wait $tracer 2>/dev/null
-            tracer=
+            kill $pulse
+            wait $pulse
+            pulse=
             echo -en "\r\e[K$sc"
+            stty echo </dev/tty
             return
         }
 
-        {
-            while :
+        while :
+        do
+            for c in '/' '—' '\' '|'
             do
-                for f in '/' '—' '\' '|'
-                do
-                    echo -en "\r$bold( $f )$r"
-                    sleep 0.05
-                done
-            done &
-        } 2>/dev/null
+                echo -en "\r$bold( $c )$r"
+                sleep 0.05
+            done
+        done &
 
-        tracer=$!
+        pulse=$!
         echo -en "$hc"
+        stty -echo
         sig=$(trap -p 2)
-        trap "atlas ex_tracer; kill -2 $$" 2
+        trap '
+            atlas _pulse
+            atlas _resolve
+            echo -e "${red}scanning terminated$r"
+            kill -2 $$
+        ' 2
     }
 
-# ────────────── cmap ─────────────────────────────────────────────────────────────────────────── ●
+# ────────────── extract ──────────────────────────────────────────────────────────────────────── ●
 
-    [[ $1 = ex_cmap ]] && {
+    [[ $1 = _extract ]] && {
         while read pkg opt
-        do [[ " ${core[*]} " =~ " $opt " ]] && cmap[$pkg]+="$opt "
+        do [[ " ${core[*]} " =~ " $opt " ]] && clineage[$pkg]+="$opt "
         done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
             proceed {
                 if (/^ /) {
@@ -118,31 +125,30 @@
         ')
     }
 
-# ────────────── interface ────────────────────────────────────────────────────────────────────── ●
+# ────────────── resolve ──────────────────────────────────────────────────────────────────────── ●
 
-    [[ $1 = ex_interface ]] && {
+    [[ $1 = _resolve ]] && {
         [[ $core ]] && {
             echo -e "${bold}core (${#core[*]})$r"
             local -n arr=core
-            local -n map=cmap
-            atlas ex_render
+            local -n lineage=clineage
+            atlas _render
+            local -n lineage=null
         }
 
         [[ $flatpaks ]] && {
             echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
             local -n arr=flatpaks
-            local -n map=nilmap
-            atlas ex_render
+            atlas _render
         }
 
         [[ $orphans ]] && {
             [[ $ops =~ o ]] && {
                 echo -e "$bold${red}orphans (${#orphans[*]})$r"
                 local -n arr=orphans
-                local -n map=nilmap
-                color=$red
-                atlas ex_render
-                color=
+                attr=$red
+                atlas _render
+                attr=
             }
 
             [[ $ops =~ d ]] && {
@@ -166,7 +172,7 @@
 
 # ────────────── render ───────────────────────────────────────────────────────────────────────── ●
 
-    [[ $1 = ex_render ]] && {
+    [[ $1 = _render ]] && {
         for i in ${!arr[*]}
         do
             pkg=${arr[i]}
@@ -176,9 +182,9 @@
             (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
             (( quiet )) && pfx=
 
-            echo -e "$color$pfx$pkg$r"
+            echo -e "$attr$pfx$pkg$r"
 
-            children=( ${map[$pkg]} )
+            children=( ${lineage[$pkg]} )
 
             for ii in ${!children[*]}
             do
@@ -189,15 +195,12 @@
                 (( last )) && indent="   " || indent="│  "
                 (( lastc )) && pfx="└─ " || pfx="├─ "
 
-                echo -e "$color$indent$dim$pfx$pkg$r"
+                echo -e "$attr$indent$dim$pfx$pkg$r"
             done
         done
 
         echo
     }
-
-# ────────────── termination ──────────────────────────────────────────────────────────────────── ●
-
 }
 
 # ───────────────────────────────────────────────────────────────────────────────────────── << atlas() >> ───────────────────────────────────────────────────────────────────────────────────────── #
