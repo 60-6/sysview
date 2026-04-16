@@ -26,15 +26,15 @@
 #  ┌──────────── error ───────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _error ]] && {
-        echo "usage:  atlas ${dim}commands$r"
-        echo "  q  ➜  quiet"
-        echo "  c  ➜  core"
-        echo "  o  ➜  orphans"
-        echo "  f  ➜  flatpaks"
-        echo "  s  ➜  save"
-        echo "  u  ➜  upgrade"
-        echo "  d  ➜  delta"
-        echo "  r  ➜  remove"
+        echo -e "usage:  atlas ${bold}[qcofsudr]$r\n"
+        echo "  q  ➜  quiet mode"
+        echo "  c  ➜  view core packages"
+        echo "  o  ➜  view orphans"
+        echo "  f  ➜  view flatpak apps"
+        echo "  s  ➜  save state"
+        echo "  u  ➜  upgrade system"
+        echo "  d  ➜  show delta"
+        echo "  r  ➜  remove orphans"
         kill -2 $$
     }
 
