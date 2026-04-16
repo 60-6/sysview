@@ -1,4 +1,4 @@
-# ─────────────────────────────────────────────────────────────────────────────────────────── \\  ▼  // ─────────────────────────────────────────────────────────────────────────────────────────── #
+# ┌────────────────────────────────────────────────────────────────────────────────────────── \\  ▼  // ──────────────────────────────────────────────────────────────────────────────────────────┐ #
                                                                                                atlas()
 {
 
@@ -9,7 +9,7 @@
         echo
 
         local attr children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse quiet scanc scano scanf sig
-        local -A clineage null
+        local -A clineage nullaa
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
 
         atlas _interpret
@@ -61,7 +61,7 @@
         {
             atlas _pulse
 
-            (( scano || scanc )) && {
+            (( scanc || scano )) && {
                 echo -en "$origin${dim}atlas: scanning orphans$r"
                 orphans=( $(pacman -Qqtd) )
             }
@@ -154,7 +154,7 @@
         [[ $ops =~ o && $orphans ]] && {
             echo -e "$bold${red}orphans (${#orphans[*]})$r"
             local -n arr=orphans
-            local -n lineage=null
+            local -n lineage=nullaa
             attr=$red
             atlas _render
             attr=
@@ -163,7 +163,7 @@
         [[ $ops =~ f && $flatpaks ]] && {
             echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
             local -n arr=flatpaks
-            local -n lineage=null
+            local -n lineage=nullaa
             atlas _render
         }
     }
@@ -238,4 +238,4 @@
 
 }
 
-# ───────────────────────────────────────────────────────────────────────────────────────── << atlas() >> ───────────────────────────────────────────────────────────────────────────────────────── #
+# └──────────────────────────────────────────────────────────────────────────────────────── << atlas() >> ────────────────────────────────────────────────────────────────────────────────────────┘ #
