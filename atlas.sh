@@ -8,9 +8,9 @@
         local executing=1
         echo
 
-        local attr children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse quiet scanc scano scanf sig
-        local -A clineage nullaa
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
+        local attr children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse quiet sig
+        local -A clineage nullaa
 
         atlas _interpret
         atlas _resolve
@@ -19,8 +19,10 @@
 #  ┌──────────── interpret ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 1
 
     [[ $1 = _interpret ]] && {
-        [[ $ops =~ [^qcofsudr\ ] ]] && atlas _error
-        [[ $ops =~ [cofsudr] ]] || ops+=cofsudr
+        ops=${ops//[ -]}
+        [[ $ops =~ [^qcofsudr] ]] && atlas _error
+        [[ -z ${ops//q/} ]] && ops+=cofsudr
+        [[ $ops =~ q ]] && quiet=1
     }
 
 #  ┌──────────── error ───────────────────────────────────────────────────────────────────────────────────────────┐ 2
@@ -33,7 +35,7 @@
         echo "  f  ➜  view flatpak apps"
         echo "  s  ➜  save state"
         echo "  u  ➜  upgrade system"
-        echo "  d  ➜  show delta"
+        echo "  d  ➜  show difference"
         echo "  r  ➜  remove orphans"
         kill -2 $$
     }
@@ -41,18 +43,12 @@
 #  ┌──────────── resolve ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 1
 
     [[ $1 = _resolve ]] && {
-        [[ $ops =~ c ]] && scanc=1
-        [[ $ops =~ [or] ]] && scano=1
-        [[ $ops =~ f ]] && scanf=1
-        [[ $ops =~ q ]] && quiet=1
-
         atlas _scan
         atlas _visualize
-
         [[ $ops =~ s ]] && atlas _save
         [[ $ops =~ u ]] && atlas _upgrade
         [[ $ops =~ d ]] && atlas _delta
-        [[ $ops =~ r && $orphans ]] && atlas _remove
+        [[ $ops =~ r ]] && atlas _remove
     }
 
 #  ┌──────────── scan ────────────────────────────────────────────────────────────────────────────────────────────┐ 2
@@ -61,18 +57,18 @@
         {
             atlas _pulse
 
-            (( scanc || scano )) && {
+            [[ $ops =~ [cor] ]] && {
                 echo -en "$origin${dim}atlas: scanning orphans$r"
                 orphans=( $(pacman -Qqtd) )
             }
 
-            (( scanc )) && {
+            [[ $ops =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r\e[K"
                 core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
                 (( quiet )) || atlas _extractcl
             }
 
-            (( scanf )) && {
+            [[ $ops =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
             }
@@ -151,20 +147,28 @@
             atlas _render
         }
 
-        [[ $ops =~ o && $orphans ]] && {
-            echo -e "$bold${red}orphans (${#orphans[*]})$r"
-            local -n arr=orphans
-            local -n lineage=nullaa
-            attr=$red
-            atlas _render
-            attr=
+        [[ $ops =~ o ]] && {
+            [[ $orphans ]] && {
+                echo -e "$bold${red}orphans (${#orphans[*]})$r"
+                local -n arr=orphans
+                local -n lineage=nullaa
+                attr=$red
+                atlas _render
+                attr=
+            } || {
+                [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
+            }
         }
 
-        [[ $ops =~ f && $flatpaks ]] && {
-            echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
-            local -n arr=flatpaks
-            local -n lineage=nullaa
-            atlas _render
+        [[ $ops =~ f ]] && {
+            [[ $flatpaks ]] && {
+                echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
+                local -n arr=flatpaks
+                local -n lineage=nullaa
+                atlas _render
+            } || {
+                [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
+            }
         }
     }
 
@@ -177,9 +181,8 @@
 
             last=$(( i == ${#arr[*]} - 1 ))
 
-            (( quiet )) || {
-                (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
-            }
+            (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
+            (( quiet )) && pfx=
 
             echo -e "$attr$pfx$pkg$r"
 
@@ -209,7 +212,7 @@
 #  ┌──────────── upgrade ─────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _upgrade ]] && {
-        echo -en "upgrade system? (y/${bold}n$r) "
+        echo -en "scan for updates? (y/${bold}n$r) "
         read intent
         [[ ${intent,,} = y ]] && {
             flatpak update
@@ -228,10 +231,14 @@
 #  ┌──────────── remove ──────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _remove ]] && {
-        echo -en "remove orphans? (y/${bold}n$r) "
-        read intent
-        [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
-        echo
+        [[ $orphans ]] && {
+            echo -en "remove orphans? (y/${bold}n$r) "
+            read intent
+            [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
+            echo
+        } || {
+            [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
+        }
     }
 
 }
