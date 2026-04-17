@@ -2,14 +2,14 @@
                                                                                                atlas()
 {
 
-#  ┌──────────── execute ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 0
+#  ┌──────────── execute ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 0
 
     (( executing )) || {
         local executing=1
         echo
 
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
-        local attr children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse quiet sig
+        local attr children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse sig sops
         local -A clineage nullaa
 
         atlas _interpret
@@ -21,11 +21,20 @@
     [[ $1 = _interpret ]] && {
         ops=${ops//[ -]}
         [[ $ops =~ [^qcofsudr] ]] && atlas _error
-        [[ -z ${ops//q/} ]] && ops+=cofsudr
-        [[ $ops =~ q ]] && quiet=1
+        [[ -z ${ops//q} ]] && ops+=cofsudr
     }
 
-#  ┌──────────── error ───────────────────────────────────────────────────────────────────────────────────────────┐ 2
+#  ┌──────────── resolve ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 1
+
+    [[ $1 = _resolve ]] && {
+        atlas _visualize
+        [[ $ops =~ s ]] && atlas _save
+        [[ $ops =~ u ]] && atlas _upgrade
+        [[ $ops =~ d ]] && atlas _delta
+        [[ $ops =~ r ]] && atlas _remove
+    }
+
+#  ┌──────────── error ─────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _error ]] && {
         echo -e "usage:  atlas ${bold}[qcofsudr]$r\n"
@@ -40,106 +49,12 @@
         kill -2 $$
     }
 
-#  ┌──────────── resolve ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 1
-
-    [[ $1 = _resolve ]] && {
-        atlas _scan
-        atlas _visualize
-        [[ $ops =~ s ]] && atlas _save
-        [[ $ops =~ u ]] && atlas _upgrade
-        [[ $ops =~ d ]] && atlas _delta
-        [[ $ops =~ r ]] && atlas _remove
-    }
-
-#  ┌──────────── scan ────────────────────────────────────────────────────────────────────────────────────────────┐ 2
-
-    [[ $1 = _scan ]] && {
-        {
-            atlas _pulse
-
-            [[ $ops =~ [cor] ]] && {
-                echo -en "$origin${dim}atlas: scanning orphans$r"
-                orphans=( $(pacman -Qqtd) )
-            }
-
-            [[ $ops =~ c ]] && {
-                echo -en "$origin${dim}atlas: scanning core$r\e[K"
-                core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
-                (( quiet )) || atlas _extractcl
-            }
-
-            [[ $ops =~ f ]] && {
-                echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
-                mapfile -t flatpaks < <(flatpak list --app --columns=name)
-            }
-
-            atlas _pulse
-        } 2>/dev/null
-    }
-
-#  ┌──────────── pulse ─────────────────────────────────────────────────────────────────────────┐ 3
-
-    [[ $1 = _pulse ]] && {
-        (( pulse )) && {
-            eval "${sig:-trap - 2}"
-            kill $pulse
-            wait $pulse
-            pulse=
-            echo -en "\r\e[K$sc"
-            stty echo </dev/tty
-            return
-        }
-
-        while :
-        do
-            for c in '/' '—' '\' '|'
-            do
-                echo -en "\r$bold( $c )$r"
-                sleep 0.05
-            done
-        done &
-
-        pulse=$!
-        echo -en "$hc"
-        stty -echo
-        sig=$(trap -p 2)
-        trap '
-            atlas _pulse
-            echo -e "${red}scanning terminated$r"
-            kill -2 $$
-        ' 2
-    }
-
-#  ┌──────────── extractcl ─────────────────────────────────────────────────────────────────────┐ 3
-
-    [[ $1 = _extractcl ]] && {
-        while read pkg opt
-        do [[ " ${core[*]} " =~ " $opt " ]] && clineage[$pkg]+="$opt "
-        done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
-            proceed {
-                if (/^ /) {
-                    gsub(/^ +|:.*/, "")
-                    print pkg, $0
-                    next
-                }
-                proceed = 0
-                next
-            }
-            /^Name/ {
-                pkg = $NF
-                next
-            }
-            /^Optional Deps/ {
-                gsub(/^Optional Deps *: *|:.*/, "")
-                print pkg, $0
-                proceed = 1
-            }
-        ')
-    }
-
-#  ┌──────────── visualize ──────────────────────────────────────────────────────────────────────────────────────┐ 2
+#  ┌──────────── visualize ─────────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _visualize ]] && {
+        sops=$ops
+        atlas _scan
+
         [[ $ops =~ c ]] && {
             echo -e "${bold}core (${#core[*]})$r"
             local -n arr=core
@@ -172,7 +87,74 @@
         }
     }
 
-#  ┌──────────── render ────────────────────────────────────────────────────────────────────────┐ 3
+#  ┌──────────── save ──────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+
+    [[ $1 = _save ]] && {
+        echo -n #wip
+    }
+
+#  ┌──────────── upgrade ───────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+
+    [[ $1 = _upgrade ]] && {
+        echo -en "scan for updates? (y/${bold}n$r) "
+        read intent
+        [[ ${intent,,} = y ]] && {
+            flatpak update
+            flatpak remove --unused -y
+            echo -n #wip
+        }
+        echo
+    }
+
+#  ┌──────────── delta ─────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+
+    [[ $1 = _delta ]] && {
+        echo -n #wip
+    }
+
+#  ┌──────────── remove ────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+
+    [[ $1 = _remove ]] && {
+        sops=o
+        atlas _scan
+
+        [[ $orphans ]] && {
+            echo -en "remove orphans? (y/${bold}n$r) "
+            read intent
+            [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
+            echo
+        } || {
+            [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
+        }
+    }
+
+#  ┌──────────── scan ──────────────────────────────────────────────────────────────────────────────────────┐ 3
+
+    [[ $1 = _scan ]] && {
+        {
+            atlas _pulse
+
+            [[ $sops =~ [co] ]] && {
+                echo -en "$origin${dim}atlas: scanning orphans$r"
+                orphans=( $(pacman -Qqtd) )
+            }
+
+            [[ $sops =~ c ]] && {
+                echo -en "$origin${dim}atlas: scanning core$r\e[K"
+                core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
+                [[ $sops =~ q ]] || atlas _extractcl
+            }
+
+            [[ $sops =~ f ]] && {
+                echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
+                mapfile -t flatpaks < <(flatpak list --app --columns=name)
+            }
+
+            atlas _pulse
+        } 2>/dev/null
+    }
+
+#  ┌──────────── render ────────────────────────────────────────────────────────────────────────────────────┐ 3
 
     [[ $1 = _render ]] && {
         for i in ${!arr[*]}
@@ -182,7 +164,7 @@
             last=$(( i == ${#arr[*]} - 1 ))
 
             (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
-            (( quiet )) && pfx=
+            [[ $ops =~ q ]] && pfx=
 
             echo -e "$attr$pfx$pkg$r"
 
@@ -203,42 +185,64 @@
         echo
     }
 
-#  ┌──────────── save ────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+#  ┌──────────── pulse ─────────────────────────────────────────────────────────────────────────┐ 4
 
-    [[ $1 = _save ]] && {
-        echo -n #wip
-    }
-
-#  ┌──────────── upgrade ─────────────────────────────────────────────────────────────────────────────────────────┐ 2
-
-    [[ $1 = _upgrade ]] && {
-        echo -en "scan for updates? (y/${bold}n$r) "
-        read intent
-        [[ ${intent,,} = y ]] && {
-            flatpak update
-            flatpak remove --unused -y
-            echo -n #wip
+    [[ $1 = _pulse ]] && {
+        (( pulse )) && {
+            eval "${sig:-trap - 2}"
+            kill $pulse
+            wait $pulse
+            pulse=
+            echo -en "\r\e[K$sc"
+            stty echo </dev/tty
+            return
         }
-        echo
+
+        while :
+        do
+            for c in '/' '—' '\' '|'
+            do
+                echo -en "\r$bold( $c )$r"
+                sleep 0.05
+            done
+        done &
+
+        pulse=$!
+        echo -en "$hc"
+        stty -echo
+        sig=$(trap -p 2)
+        trap '
+            atlas _pulse
+            echo -e "${red}scanning terminated$r"
+            kill -2 $$
+        ' 2
     }
 
-#  ┌──────────── delta ───────────────────────────────────────────────────────────────────────────────────────────┐ 2
+#  ┌──────────── extractcl ─────────────────────────────────────────────────────────────────────┐ 4
 
-    [[ $1 = _delta ]] && {
-        echo -n #wip
-    }
-
-#  ┌──────────── remove ──────────────────────────────────────────────────────────────────────────────────────────┐ 2
-
-    [[ $1 = _remove ]] && {
-        [[ $orphans ]] && {
-            echo -en "remove orphans? (y/${bold}n$r) "
-            read intent
-            [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
-            echo
-        } || {
-            [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
-        }
+    [[ $1 = _extractcl ]] && {
+        while read pkg opt
+        do [[ " ${core[*]} " =~ " $opt " ]] && clineage[$pkg]+="$opt "
+        done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
+            proceed {
+                if (/^ /) {
+                    gsub(/^ +|:.*/, "")
+                    print pkg, $0
+                    next
+                }
+                proceed = 0
+                next
+            }
+            /^Name/ {
+                pkg = $NF
+                next
+            }
+            /^Optional Deps/ {
+                gsub(/^Optional Deps *: *|:.*/, "")
+                print pkg, $0
+                proceed = 1
+            }
+        ')
     }
 
 }
