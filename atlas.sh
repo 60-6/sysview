@@ -102,7 +102,7 @@
             flatpak update
             flatpak remove --unused -y
             echo -n #wip
-        }
+        } 2>/dev/null
         echo
     }
 
