@@ -135,7 +135,7 @@
             atlas _pulse
 
             [[ $sops =~ [co] ]] && {
-                echo -en "$origin${dim}atlas: scanning orphans$r"
+                echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
                 orphans=( $(pacman -Qqtd) )
             }
 
