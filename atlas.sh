@@ -9,7 +9,7 @@
         echo
 
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
-        local attr children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse sig sops
+        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse sig
         local -A clineage nullaa
 
         atlas _interpret
@@ -20,7 +20,7 @@
 
     [[ $1 = _interpret ]] && {
         ops=${ops//[ -]}
-        [[ $ops =~ [^qcofsudr] ]] && atlas _error
+        [[ $ops =~ [^qcofsudr] ]] && atlas _clarify
         [[ -z ${ops//q} ]] && ops+=cofsudr
     }
 
@@ -34,9 +34,9 @@
         [[ $ops =~ r ]] && atlas _remove
     }
 
-#  ┌──────────── error ─────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+#  ┌──────────── clarify ───────────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
-    [[ $1 = _error ]] && {
+    [[ $1 = _clarify ]] && {
         echo -e "usage:  atlas ${bold}[qcofsudr]$r\n"
         echo "  q  ➜  quiet mode"
         echo "  c  ➜  view core packages"
@@ -44,7 +44,7 @@
         echo "  f  ➜  view flatpak apps"
         echo "  s  ➜  save state"
         echo "  u  ➜  upgrade system"
-        echo "  d  ➜  show difference"
+        echo "  d  ➜  view difference"
         echo "  r  ➜  remove orphans"
         kill -2 $$
     }
@@ -52,8 +52,7 @@
 #  ┌──────────── visualize ─────────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _visualize ]] && {
-        sops=$ops
-        atlas _scan
+        atlas _scan $ops
 
         [[ $ops =~ c ]] && {
             echo -e "${bold}core (${#core[*]})$r"
@@ -67,9 +66,7 @@
                 echo -e "$bold${red}orphans (${#orphans[*]})$r"
                 local -n arr=orphans
                 local -n lineage=nullaa
-                attr=$red
-                atlas _render
-                attr=
+                atlas _render $red
             } || {
                 [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
             }
@@ -115,8 +112,7 @@
 #  ┌──────────── remove ────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
 
     [[ $1 = _remove ]] && {
-        sops=o
-        atlas _scan
+        atlas _scan o
 
         [[ $orphans ]] && {
             echo -en "remove orphans? (y/${bold}n$r) "
@@ -134,18 +130,18 @@
         {
             atlas _pulse
 
-            [[ $sops =~ [co] ]] && {
-                echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
+            [[ $2 =~ [co] ]] && {
+                echo -en "$origin${dim}atlas: scanning orphans$r"
                 orphans=( $(pacman -Qqtd) )
             }
 
-            [[ $sops =~ c ]] && {
+            [[ $2 =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r\e[K"
                 core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
-                [[ $sops =~ q ]] || atlas _extractcl
+                [[ $2 =~ q ]] || atlas _extractcl
             }
 
-            [[ $sops =~ f ]] && {
+            [[ $2 =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
             }
@@ -166,7 +162,7 @@
             (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
             [[ $ops =~ q ]] && pfx=
 
-            echo -e "$attr$pfx$pkg$r"
+            echo -e "$2$pfx$pkg$r"
 
             children=( ${lineage[$pkg]} )
 
@@ -179,7 +175,7 @@
                 (( last )) && indent="   " || indent="│  "
                 (( lastc )) && pfx="└─ " || pfx="├─ "
 
-                echo -e "$attr$indent$dim$pfx$pkg$r"
+                echo -e "$2$indent$dim$pfx$pkg$r"
             done
         done
         echo
