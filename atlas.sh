@@ -97,7 +97,7 @@
         read intent
         [[ ${intent,,} = y ]] && {
             flatpak update
-            flatpak remove --unused -y
+            flatpak remove --unused
             echo -n #wip
         } 2>/dev/null
         echo
