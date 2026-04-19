@@ -115,7 +115,7 @@
 
     [[ $1 = .save ]] && {
         atlas .scan a
-        echo -n #wip
+        #wip
     }
 
     [[ $1 = .upgrade ]] && {
@@ -124,14 +124,14 @@
         [[ ${intent,,} = y ]] && {
             flatpak update
             flatpak remove --unused
-            echo -n #wip
+            #wip
         } 2>/dev/null
         echo
     }
 
     [[ $1 = .delta ]] && {
         atlas .scan a
-        echo -n #wip
+        #wip
     }
 
     [[ $1 = .remove ]] && {
@@ -141,6 +141,7 @@
             echo -en "remove orphans? (y/${bold}n$r) "
             atlas .ask
             [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
+            #wip
             echo
         } || {
             [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
