@@ -27,7 +27,7 @@
     [[ $1 = .resolve ]] && {
         [[ $ops =~ n ]] || atlas .scan $ops
 
-        while read -n1 i
+        for i in $(fold -w1 <<< $ops)
         do
             [[ $i = c ]] && atlas .core
             [[ $i = o ]] && atlas .orphans
@@ -36,7 +36,7 @@
             [[ $i = u ]] && atlas .upgrade
             [[ $i = d ]] && atlas .delta
             [[ $i = r ]] && atlas .remove
-        done <<< $ops
+        done
     }
 
 #  ┌──────────── layer 2 ───────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -98,7 +98,7 @@
     [[ $1 = .upgrade ]] && {
         echo -en "scan for updates? (y/${bold}n$r) "
         scache=
-        read intent </dev/tty
+        read intent
         [[ ${intent,,} = y ]] && {
             flatpak update
             flatpak remove --unused
@@ -118,7 +118,7 @@
         [[ $orphans ]] && {
             echo -en "remove orphans? (y/${bold}n$r) "
             scache=
-            read intent </dev/tty
+            read intent
             [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
             echo
         } || {
