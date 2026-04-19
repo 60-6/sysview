@@ -2,43 +2,48 @@
                                                                                                atlas()
 {
 
-#  ┌──────────── execute ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 0
+#  ┌──────────── layer 0 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     (( executing )) || {
         local executing=1
         echo
 
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
-        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse sig
+        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse scache sig
         local -A clineage nullaa
 
-        atlas _interpret
-        atlas _resolve
+        atlas .interpret
+        atlas .resolve
     }
 
-#  ┌──────────── interpret ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 1
+#  ┌──────────── layer 1 ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
-    [[ $1 = _interpret ]] && {
+    [[ $1 = .interpret ]] && {
         ops=${ops//[ -]}
-        [[ $ops =~ [^qcofsudr] ]] && atlas _clarify
-        [[ -z ${ops//q} ]] && ops+=cofsudr
+        [[ $ops =~ [^qncofsudr] ]] && atlas .clarify
+        [[ -z ${ops//[qn]} ]] && ops+=cofsudr
     }
 
-#  ┌──────────── resolve ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 1
+    [[ $1 = .resolve ]] && {
+        [[ $ops =~ n ]] || atlas .scan $ops
 
-    [[ $1 = _resolve ]] && {
-        atlas _visualize
-        [[ $ops =~ s ]] && atlas _save
-        [[ $ops =~ u ]] && atlas _upgrade
-        [[ $ops =~ d ]] && atlas _delta
-        [[ $ops =~ r ]] && atlas _remove
+        while read -n1 i
+        do
+            [[ $i = c ]] && atlas .core
+            [[ $i = o ]] && atlas .orphans
+            [[ $i = f ]] && atlas .flatpaks
+            [[ $i = s ]] && atlas .save
+            [[ $i = u ]] && atlas .upgrade
+            [[ $i = d ]] && atlas .delta
+            [[ $i = r ]] && atlas .remove
+        done <<< $ops
     }
 
-#  ┌──────────── clarify ───────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+#  ┌──────────── layer 2 ───────────────────────────────────────────────────────────────────────────────────────────────┐
 
-    [[ $1 = _clarify ]] && {
-        echo -e "usage:  atlas ${bold}[qcofsudr]$r\n"
+    [[ $1 = .clarify ]] && {
         echo "  q  ➜  quiet mode"
+        echo "  n  ➜  no cache"
         echo "  c  ➜  view core packages"
         echo "  o  ➜  view orphans"
         echo "  f  ➜  view flatpak apps"
@@ -46,55 +51,54 @@
         echo "  u  ➜  upgrade system"
         echo "  d  ➜  view difference"
         echo "  r  ➜  remove orphans"
+
         kill -2 $$
     }
 
-#  ┌──────────── visualize ─────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+    [[ $1 = .core ]] && {
+        atlas .scan c
 
-    [[ $1 = _visualize ]] && {
-        atlas _scan $ops
+        echo -e "${bold}core (${#core[*]})$r"
+        local -n arr=core
+        local -n lineage=clineage
+        atlas .render
+    }
 
-        [[ $ops =~ c ]] && {
-            echo -e "${bold}core (${#core[*]})$r"
-            local -n arr=core
-            local -n lineage=clineage
-            atlas _render
-        }
+    [[ $1 = .orphans ]] && {
+        atlas .scan o
 
-        [[ $ops =~ o ]] && {
-            [[ $orphans ]] && {
-                echo -e "$bold${red}orphans (${#orphans[*]})$r"
-                local -n arr=orphans
-                local -n lineage=nullaa
-                atlas _render $red
-            } || {
-                [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
-            }
-        }
-
-        [[ $ops =~ f ]] && {
-            [[ $flatpaks ]] && {
-                echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
-                local -n arr=flatpaks
-                local -n lineage=nullaa
-                atlas _render
-            } || {
-                [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
-            }
+        [[ $orphans ]] && {
+            echo -e "$bold${red}orphans (${#orphans[*]})$r"
+            local -n arr=orphans
+            local -n lineage=nullaa
+            atlas .render $red
+        :;} || {
+            [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
         }
     }
 
-#  ┌──────────── save ──────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
+    [[ $1 = .flatpaks ]] && {
+        atlas .scan f
 
-    [[ $1 = _save ]] && {
+        [[ $flatpaks ]] && {
+            echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
+            local -n arr=flatpaks
+            local -n lineage=nullaa
+            atlas .render
+        :;} || {
+            [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
+        }
+    }
+
+    [[ $1 = .save ]] && {
+        atlas .scan a
         echo -n #wip
     }
 
-#  ┌──────────── upgrade ───────────────────────────────────────────────────────────────────────────────────────────────┐ 2
-
-    [[ $1 = _upgrade ]] && {
+    [[ $1 = .upgrade ]] && {
         echo -en "scan for updates? (y/${bold}n$r) "
-        read intent
+        scache=
+        read intent </dev/tty
         [[ ${intent,,} = y ]] && {
             flatpak update
             flatpak remove --unused
@@ -103,20 +107,18 @@
         echo
     }
 
-#  ┌──────────── delta ─────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
-
-    [[ $1 = _delta ]] && {
+    [[ $1 = .delta ]] && {
+        atlas .scan a
         echo -n #wip
     }
 
-#  ┌──────────── remove ────────────────────────────────────────────────────────────────────────────────────────────────┐ 2
-
-    [[ $1 = _remove ]] && {
-        atlas _scan o
+    [[ $1 = .remove ]] && {
+        atlas .scan o
 
         [[ $orphans ]] && {
             echo -en "remove orphans? (y/${bold}n$r) "
-            read intent
+            scache=
+            read intent </dev/tty
             [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
             echo
         } || {
@@ -124,43 +126,50 @@
         }
     }
 
-#  ┌──────────── scan ──────────────────────────────────────────────────────────────────────────────────────┐ 3
+#  ┌──────────── layer 3 ───────────────────────────────────────────────────────────────────────────────────┐
 
-    [[ $1 = _scan ]] && {
+    [[ $1 = .scan ]] && {
+        [[ $2 =~ a ]] && set -- $1 ${2}cofq
+        [[ $2 =~ r ]] && set -- $1 ${2}o
+        [[ $ops =~ q ]] && set -- $1 ${2}q
+        [[ $ops =~ n ]] || set -- $1 ${2//[$scache]}
+
         {
-            atlas _pulse
+            atlas .pulse
 
             [[ $2 =~ [co] ]] && {
                 echo -en "$origin${dim}atlas: scanning orphans$r"
                 orphans=( $(pacman -Qqtd) )
+                scache+=o
             }
 
             [[ $2 =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r\e[K"
                 core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
-                [[ $2 =~ q ]] || atlas _extractcl
+                [[ $2 =~ q ]] || atlas .extractcl
+                scache+=c
             }
 
             [[ $2 =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
+                scache+=f
             }
 
-            atlas _pulse
+            atlas .pulse
         } 2>/dev/null
     }
 
-#  ┌──────────── render ────────────────────────────────────────────────────────────────────────────────────┐ 3
-
-    [[ $1 = _render ]] && {
+    [[ $1 = .render ]] && {
         for i in ${!arr[*]}
         do
             pkg=${arr[i]}
 
             last=$(( i == ${#arr[*]} - 1 ))
 
-            (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
-            [[ $ops =~ q ]] && pfx=
+            [[ $ops =~ q ]] || {
+                (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
+            }
 
             echo -e "$2$pfx$pkg$r"
 
@@ -181,9 +190,9 @@
         echo
     }
 
-#  ┌──────────── pulse ─────────────────────────────────────────────────────────────────────────┐ 4
+#  ┌──────────── layer 4 ─────────────────────────────────────────────────────────────────────────┐
 
-    [[ $1 = _pulse ]] && {
+    [[ $1 = .pulse ]] && {
         (( pulse )) && {
             eval "${sig:-trap - 2}"
             kill $pulse
@@ -208,15 +217,14 @@
         stty -echo
         sig=$(trap -p 2)
         trap '
-            atlas _pulse
+            atlas .pulse
             echo -e "${red}scanning terminated$r"
             kill -2 $$
         ' 2
     }
 
-#  ┌──────────── extractcl ─────────────────────────────────────────────────────────────────────┐ 4
-
-    [[ $1 = _extractcl ]] && {
+    [[ $1 = .extractcl ]] && {
+        clineage=()
         while read pkg opt
         do [[ " ${core[*]} " =~ " $opt " ]] && clineage[$pkg]+="$opt "
         done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
