@@ -9,8 +9,8 @@
         echo
 
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
-        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse scache sig
-        local -A clineage nullaa
+        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse log sig siphon
+        local -A lineage null
 
         atlas .interpret
         atlas .resolve
@@ -25,6 +25,8 @@
     }
 
     [[ $1 = .resolve ]] && {
+        atlas .trap
+
         [[ $ops =~ n ]] || atlas .scan $ops
 
         for i in $(fold -w1 <<< $ops)
@@ -37,6 +39,8 @@
             [[ $i = d ]] && atlas .delta
             [[ $i = r ]] && atlas .remove
         done
+
+        atlas .trap 1
     }
 
 #  ┌──────────── layer 2 ───────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -55,12 +59,31 @@
         kill -2 $$
     }
 
+    [[ $1 = .trap ]] && {
+        (( $2 )) && {
+            eval "${sig:-trap - 2}"
+            echo -en "$sc"
+            stty echo </dev/tty
+            return
+        }
+
+        echo -en "$hc"
+        stty -echo
+        sig=$(trap -p 2)
+        trap '
+            (( pulse )) && atlas .pulse
+            atlas .trap 1
+            echo -e "$red\ratlas: terminated$r\e[K"
+            kill -2 $$
+        ' 2
+    }
+
     [[ $1 = .core ]] && {
         atlas .scan c
 
         echo -e "${bold}core (${#core[*]})$r"
         local -n arr=core
-        local -n lineage=clineage
+        local -n assoca=lineage
         atlas .render
     }
 
@@ -70,7 +93,7 @@
         [[ $orphans ]] && {
             echo -e "$bold${red}orphans (${#orphans[*]})$r"
             local -n arr=orphans
-            local -n lineage=nullaa
+            local -n assoca=null
             atlas .render $red
         :;} || {
             [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
@@ -83,7 +106,7 @@
         [[ $flatpaks ]] && {
             echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
             local -n arr=flatpaks
-            local -n lineage=nullaa
+            local -n assoca=null
             atlas .render
         :;} || {
             [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
@@ -97,8 +120,7 @@
 
     [[ $1 = .upgrade ]] && {
         echo -en "scan for updates? (y/${bold}n$r) "
-        scache=
-        read intent
+        atlas .ask
         [[ ${intent,,} = y ]] && {
             flatpak update
             flatpak remove --unused
@@ -117,8 +139,7 @@
 
         [[ $orphans ]] && {
             echo -en "remove orphans? (y/${bold}n$r) "
-            scache=
-            read intent
+            atlas .ask
             [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[*]}
             echo
         } || {
@@ -132,28 +153,28 @@
         [[ $2 =~ a ]] && set -- $1 ${2}cofq
         [[ $2 =~ r ]] && set -- $1 ${2}o
         [[ $ops =~ q ]] && set -- $1 ${2}q
-        [[ $ops =~ n ]] || set -- $1 ${2//[$scache]}
+        [[ $ops =~ n ]] || set -- $1 ${2//[$log]}
 
         {
             atlas .pulse
 
             [[ $2 =~ [co] ]] && {
-                echo -en "$origin${dim}atlas: scanning orphans$r"
+                echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
                 orphans=( $(pacman -Qqtd) )
-                scache+=o
+                log+=o
             }
 
             [[ $2 =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r\e[K"
                 core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
-                [[ $2 =~ q ]] || atlas .extractcl
-                scache+=c
+                [[ $2 =~ q ]] || atlas .extract
+                log+=c
             }
 
             [[ $2 =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
-                scache+=f
+                log+=f
             }
 
             atlas .pulse
@@ -173,7 +194,7 @@
 
             echo -e "$2$pfx$pkg$r"
 
-            children=( ${lineage[$pkg]} )
+            children=( ${assoca[$pkg]} )
 
             for ii in ${!children[*]}
             do
@@ -190,16 +211,26 @@
         echo
     }
 
+    [[ $1 = .ask ]] && {
+        log=
+        while read -t 0 siphon
+        do read siphon
+        done
+        echo -en "$sc"
+        stty echo
+        read intent
+        stty -echo
+        echo -en "$hc"
+    }
+
 #  ┌──────────── layer 4 ─────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .pulse ]] && {
         (( pulse )) && {
-            eval "${sig:-trap - 2}"
             kill $pulse
             wait $pulse
             pulse=
-            echo -en "\r\e[K$sc"
-            stty echo </dev/tty
+            echo -en "\r\e[K"
             return
         }
 
@@ -213,20 +244,12 @@
         done &
 
         pulse=$!
-        echo -en "$hc"
-        stty -echo
-        sig=$(trap -p 2)
-        trap '
-            atlas .pulse
-            echo -e "${red}scanning terminated$r"
-            kill -2 $$
-        ' 2
     }
 
-    [[ $1 = .extractcl ]] && {
-        clineage=()
+    [[ $1 = .extract ]] && {
+        lineage=()
         while read pkg opt
-        do [[ " ${core[*]} " =~ " $opt " ]] && clineage[$pkg]+="$opt "
+        do [[ " ${core[*]} " =~ " $opt " ]] && lineage[$pkg]+="$opt "
         done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
             proceed {
                 if (/^ /) {
