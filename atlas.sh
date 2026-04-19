@@ -9,7 +9,7 @@
         echo
 
         local bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G" ops=$*
-        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse log sig siphon
+        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse log sig
         local -A lineage null
 
         atlas .interpret
@@ -25,7 +25,7 @@
     }
 
     [[ $1 = .resolve ]] && {
-        atlas .trap
+        atlas .trap 1
 
         [[ $ops =~ n ]] || atlas .scan $ops
 
@@ -40,7 +40,7 @@
             [[ $i = r ]] && atlas .remove
         done
 
-        atlas .trap 1
+        atlas .trap 0
     }
 
 #  ┌──────────── layer 2 ───────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -61,21 +61,21 @@
 
     [[ $1 = .trap ]] && {
         (( $2 )) && {
-            eval "${sig:-trap - 2}"
-            echo -en "$sc"
-            stty echo </dev/tty
+            echo -en "$hc"
+            stty -echo
+            sig=$(trap -p 2)
+            trap '
+                (( pulse )) && atlas .pulse
+                atlas .trap 0
+                echo -e "$red\ratlas: terminated$r\e[K"
+                kill -2 $$
+            ' 2
             return
         }
 
-        echo -en "$hc"
-        stty -echo
-        sig=$(trap -p 2)
-        trap '
-            (( pulse )) && atlas .pulse
-            atlas .trap 1
-            echo -e "$red\ratlas: terminated$r\e[K"
-            kill -2 $$
-        ' 2
+        eval "${sig:-trap - 2}"
+        echo -en "$sc"
+        stty echo </dev/tty
     }
 
     [[ $1 = .core ]] && {
@@ -213,8 +213,8 @@
 
     [[ $1 = .ask ]] && {
         log=
-        while read -t 0 siphon
-        do read siphon
+        while read -t 0 intent
+        do read intent
         done
         echo -en "$sc"
         stty echo
