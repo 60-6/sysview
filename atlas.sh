@@ -7,7 +7,7 @@
     (( executing )) || {
         local executing=1 ops=$* bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
         local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse log sig
-        local -A lineage null
+        local -A delta lineage null
 
         echo
         atlas .resolve
@@ -18,7 +18,7 @@
     [[ $1 = .resolve ]] && {
         ops=${ops//[ -]}
         [[ $ops =~ [^qncofsudr] ]] && atlas .clarify
-        [[ -z ${ops//[qn]} ]] && ops+=cofsudr
+        [[ ${ops//[qn]} ]] || ops+=cofsudr
 
         atlas .sig 1
 
@@ -67,7 +67,7 @@
                 echo -e "$red\ratlas: terminated$r\e[K"
                 kill -2 $$
             ' 2
-        return;}
+        return }
 
         eval "${sig:-trap - 2}"
         echo -en "$sc"
@@ -77,7 +77,7 @@
     [[ $1 = .core ]] && {
         atlas .scan c
 
-        echo -e "${bold}core (${#core[*]})$r"
+        echo -e "${bold}core (${#core[@]})$r"
         local -n arr=core
         local -n assoca=lineage
         atlas .render
@@ -87,11 +87,11 @@
         atlas .scan o
 
         [[ $orphans ]] && {
-            echo -e "$bold${red}orphans (${#orphans[*]})$r"
+            echo -e "$bold${red}orphans (${#orphans[@]})$r"
             local -n arr=orphans
             local -n assoca=null
             atlas .render $red
-        return;}
+        return }
 
         [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
     }
@@ -100,18 +100,25 @@
         atlas .scan f
 
         [[ $flatpaks ]] && {
-            echo -e "${bold}flatpaks (${#flatpaks[*]})$r"
+            echo -e "${bold}flatpaks (${#flatpaks[@]})$r"
             local -n arr=flatpaks
             local -n assoca=null
             atlas .render
-        return;}
+        return }
 
         [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
     }
 
     [[ $1 = .save ]] && {
         atlas .scan a
-        #wip
+
+        declare -gA save
+
+        save[core]=$(printf "%s\n" "${core[@]}")
+        save[orphans]=$(printf "%s\n" "${orphans[@]}")
+        save[flatpaks]=$(printf "%s\n" "${flatpaks[@]}")
+
+        [[ $ops =~ [^s] ]] || echo -e "${dim}saved$r\n"
     }
 
     [[ $1 = .upgrade ]] && {
@@ -136,12 +143,46 @@
         }
 
         atlas .read
-        echo
     }
 
     [[ $1 = .delta ]] && {
         atlas .scan a
-        #wip
+
+        [[ ${save[@]} ]] || {
+            echo -e "${dim}no save found$r\n"
+        return }
+
+        delta[core0]=$(grep -vxf <(printf "%s\n" "${core[@]}") <(echo "${save[core]}"))
+        delta[core1]=$(grep -vxf <(echo "${save[core]}") <(printf "%s\n" "${core[@]}"))
+
+        delta[orphans0]=$(grep -vxf <(printf "%s\n" "${orphans[@]}") <(echo "${save[orphans]}"))
+        delta[orphans1]=$(grep -vxf <(echo "${save[orphans]}") <(printf "%s\n" "${orphans[@]}"))
+
+        delta[flatpaks0]=$(grep -vxf <(printf "%s\n" "${flatpaks[@]}") <(echo "${save[flatpaks]}"))
+        delta[flatpaks1]=$(grep -vxf <(echo "${save[flatpaks]}") <(printf "%s\n" "${flatpaks[@]}"))
+
+        [[ ${delta[core0]}${delta[core1]} ]] && {
+            echo -e "${bold}core delta$r"
+            [[ ${delta[core0]} ]] && echo -e "$red${delta[core0]}$r"
+            [[ ${delta[core1]} ]] && echo -e "${delta[core1]}"
+            echo
+        }
+
+        [[ ${delta[orphans0]}${delta[orphans1]} ]] && {
+            echo -e "${bold}orphans delta$r"
+            [[ ${delta[orphans0]} ]] && echo -e "$red${delta[orphans0]}$r"
+            [[ ${delta[orphans1]} ]] && echo -e "${delta[orphans1]}"
+            echo
+        }
+
+        [[ ${delta[flatpaks0]}${delta[flatpaks1]} ]] && {
+            echo -e "${bold}flatpaks delta$r"
+            [[ ${delta[flatpaks0]} ]] && echo -e "$red${delta[flatpaks0]}$r"
+            [[ ${delta[flatpaks1]} ]] && echo -e "${delta[flatpaks1]}"
+            echo
+        }
+
+        [[ $(printf "%s" "${delta[@]}") || $ops =~ [^sd] ]] || echo -e "${dim}nil$r\n"
     }
 
     [[ $1 = .remove ]] && {
@@ -152,14 +193,12 @@
             atlas .read 1
 
             [[ ${intent,,} = y ]] && {
-                sudo pacman -Rns ${orphans[*]}
+                sudo pacman -Rns ${orphans[@]}
                 log=${log//o}
-                #wip
             }
 
             atlas .read
-            echo
-        return;}
+        return }
 
         [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
     }
@@ -177,19 +216,22 @@
         {
             [[ $2 =~ [co] ]] && {
                 echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
+                
                 orphans=( $(pacman -Qqtd) )
                 log+=o
             }
 
             [[ $2 =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r\e[K"
-                core=( $(grep -vxf <(printf "%s\n" ${orphans[*]}) <(pacman -Qqtt)) )
+                
+                core=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
                 [[ $2 =~ q ]] || atlas .extract
                 log+=c
             }
 
             [[ $2 =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
+                
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
                 log+=f
             }
@@ -199,11 +241,11 @@
     }
 
     [[ $1 = .render ]] && {
-        for i in ${!arr[*]}
+        for i in ${!arr[@]}
         do
             pkg=${arr[i]}
 
-            last=$(( i == ${#arr[*]} - 1 ))
+            last=$(( i == ${#arr[@]} - 1 ))
             [[ $ops =~ q ]] || {
                 (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
             }
@@ -212,11 +254,11 @@
 
             children=( ${assoca[$pkg]} )
 
-            for ii in ${!children[*]}
+            for ii in ${!children[@]}
             do
                 pkg=${children[ii]}
 
-                lastc=$(( ii == ${#children[*]} - 1 ))
+                lastc=$(( ii == ${#children[@]} - 1 ))
                 (( last )) && indent="   " || indent="│  "
                 (( lastc )) && pfx="└─ " || pfx="├─ "
 
@@ -236,10 +278,10 @@
             echo -en "$sc"
             stty echo
             read intent
-        return;}
+        return }
 
         stty -echo
-        echo -en "$hc"
+        echo -en "$hc\n"
     }
 
 #  ┌──────────── layer 4 ─────────────────────────────────────────────────────────────────────────┐
@@ -255,7 +297,7 @@
                         sleep 0.05
                     done
                 done & pulse=$!
-            return;}
+            return }
 
             kill $pulse
             wait $pulse
@@ -267,8 +309,8 @@
         lineage=()
 
         while read pkg opt
-        do [[ " ${core[*]} " =~ " $opt " ]] && lineage[$pkg]+="$opt "
-        done < <(LC_ALL=C pacman -Qi ${core[*]} | awk '
+        do [[ " ${core[@]} " =~ " $opt " ]] && lineage[$pkg]+="$opt "
+        done < <(LC_ALL=C pacman -Qi ${core[@]} | awk '
             proceed {
                 if (/^ /) {
                     gsub(/^ +|:.*/, "")
