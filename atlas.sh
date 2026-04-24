@@ -67,7 +67,7 @@
                 echo -e "$red\ratlas: terminated$r\e[K"
                 kill -2 $$
             ' 2
-        return }
+        return;}
 
         eval "${sig:-trap - 2}"
         echo -en "$sc"
@@ -91,7 +91,7 @@
             local -n arr=orphans
             local -n assoca=null
             atlas .render $red
-        return }
+        return;}
 
         [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
     }
@@ -104,7 +104,7 @@
             local -n arr=flatpaks
             local -n assoca=null
             atlas .render
-        return }
+        return;}
 
         [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
     }
@@ -150,7 +150,7 @@
 
         [[ ${save[@]} ]] || {
             echo -e "${dim}no save found$r\n"
-        return }
+        return;}
 
         delta[core0]=$(grep -vxf <(printf "%s\n" "${core[@]}") <(echo "${save[core]}"))
         delta[core1]=$(grep -vxf <(echo "${save[core]}") <(printf "%s\n" "${core[@]}"))
@@ -198,7 +198,7 @@
             }
 
             atlas .read
-        return }
+        return;}
 
         [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
     }
@@ -216,14 +216,14 @@
         {
             [[ $2 =~ [co] ]] && {
                 echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
-                
+
                 orphans=( $(pacman -Qqtd) )
                 log+=o
             }
 
             [[ $2 =~ c ]] && {
                 echo -en "$origin${dim}atlas: scanning core$r\e[K"
-                
+
                 core=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
                 [[ $2 =~ q ]] || atlas .extract
                 log+=c
@@ -231,7 +231,7 @@
 
             [[ $2 =~ f ]] && {
                 echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
-                
+
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
                 log+=f
             }
@@ -278,7 +278,7 @@
             echo -en "$sc"
             stty echo
             read intent
-        return }
+        return;}
 
         stty -echo
         echo -en "$hc\n"
@@ -297,7 +297,7 @@
                         sleep 0.05
                     done
                 done & pulse=$!
-            return }
+            return;}
 
             kill $pulse
             wait $pulse
