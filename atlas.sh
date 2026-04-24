@@ -5,34 +5,30 @@
 #  ┌──────────── layer 0 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     (( executing )) || {
-        local executing=1 ops=$* bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
-        local children core flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse log sig
+        local executing=1 bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
+        local children core flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse log sig
         local -A delta lineage null
 
         echo
-        atlas .resolve
+        atlas .resolve ${*//[ -]}
     }
 
 #  ┌──────────── layer 1 ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .resolve ]] && {
-        ops=${ops//[ -]}
-        [[ $ops =~ [^qncofsudr] ]] && atlas .clarify
-        [[ ${ops//[qn]} ]] || ops+=cofsudr
+        [[ $2 =~ [^qncofsudr] ]] && atlas .clarify
+        ops=${2//[qn]}
+        mods=${2//[$ops]}
+
+        [[ $ops ]] || ops=cofsudr
 
         atlas .sig 1
 
-        [[ $ops =~ n ]] || atlas .scan $ops
+        [[ $mods =~ n ]] || atlas .scan $2
 
         for i in $(fold -w1 <<< $ops)
         do
-            [[ $i = c ]] && atlas .core
-            [[ $i = o ]] && atlas .orphans
-            [[ $i = f ]] && atlas .flatpaks
-            [[ $i = s ]] && atlas .save
-            [[ $i = u ]] && atlas .upgrade
-            [[ $i = d ]] && atlas .delta
-            [[ $i = r ]] && atlas .remove
+            atlas .$i
         done
 
         atlas .sig
@@ -74,7 +70,7 @@
         stty echo </dev/tty
     }
 
-    [[ $1 = .core ]] && {
+    [[ $1 = .c ]] && {
         atlas .scan c
 
         echo -e "${bold}core (${#core[@]})$r"
@@ -83,7 +79,7 @@
         atlas .render
     }
 
-    [[ $1 = .orphans ]] && {
+    [[ $1 = .o ]] && {
         atlas .scan o
 
         [[ $orphans ]] && {
@@ -96,7 +92,7 @@
         [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
     }
 
-    [[ $1 = .flatpaks ]] && {
+    [[ $1 = .f ]] && {
         atlas .scan f
 
         [[ $flatpaks ]] && {
@@ -109,7 +105,7 @@
         [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
     }
 
-    [[ $1 = .save ]] && {
+    [[ $1 = .s ]] && {
         atlas .scan a
 
         declare -gA save
@@ -121,15 +117,13 @@
         [[ $ops =~ [^s] ]] || echo -e "${dim}saved$r\n"
     }
 
-    [[ $1 = .upgrade ]] && {
-        echo -en "scan for updates? (y/${bold}n$r) "
-        atlas .read 1
+    [[ $1 = .u ]] && {
+        [[ $ops =~ [^u] ]] && {
+            echo -en "scan for updates? (y/${bold}n$r) "
+            atlas .read 1
+        :;} || intent=y
 
         [[ ${intent,,} = y ]] && {
-            {
-                flatpak update
-                flatpak remove --unused
-            } 2>/dev/null
 
             [[ $(command -v yay) ]] && {
                 yay
@@ -139,13 +133,18 @@
                 :;} || sudo pacman -Syu
             }
 
+            {
+                flatpak update
+                flatpak remove --unused
+            } 2>/dev/null
+
             log=
         }
 
         atlas .read
     }
 
-    [[ $1 = .delta ]] && {
+    [[ $1 = .d ]] && {
         atlas .scan a
 
         [[ ${save[@]} ]] || {
@@ -185,12 +184,14 @@
         [[ $(printf "%s" "${delta[@]}") || $ops =~ [^sd] ]] || echo -e "${dim}nil$r\n"
     }
 
-    [[ $1 = .remove ]] && {
+    [[ $1 = .r ]] && {
         atlas .scan o
 
         [[ $orphans ]] && {
-            echo -en "remove orphans? (y/${bold}n$r) "
-            atlas .read 1
+            [[ $ops =~ [^r] ]] && {
+                echo -en "remove orphans? (y/${bold}n$r) "
+                atlas .read 1
+            :;} || intent=y
 
             [[ ${intent,,} = y ]] && {
                 sudo pacman -Rns ${orphans[@]}
@@ -208,8 +209,8 @@
     [[ $1 = .scan ]] && {
         [[ $2 =~ a ]] && set -- $1 ${2}cofq
         [[ $2 =~ r ]] && set -- $1 ${2}o
-        [[ $ops =~ q ]] && set -- $1 ${2}q
-        [[ $ops =~ n ]] || set -- $1 ${2//[$log]}
+        [[ $mods =~ q ]] && set -- $1 ${2}q
+        [[ $mods =~ n ]] || set -- $1 ${2//[$log]}
 
         atlas .pulse 1
 
@@ -246,7 +247,7 @@
             pkg=${arr[i]}
 
             last=$(( i == ${#arr[@]} - 1 ))
-            [[ $ops =~ q ]] || {
+            [[ $mods =~ q ]] || {
                 (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
             }
 
