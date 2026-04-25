@@ -10,12 +10,13 @@
         local -A delta lineage null
 
         echo
-        atlas .resolve ${*//[ -]}
+        atlas .resolve "$*"
     }
 
 #  ┌──────────── layer 1 ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .resolve ]] && {
+        set . ${2//[ -]}
         [[ $2 =~ [^qncofsudr] ]] && atlas .clarify
         ops=${2//[qn]}
         mods=${2//[$ops]}
@@ -27,8 +28,7 @@
         [[ $mods =~ n ]] || atlas .scan $2
 
         for i in $(fold -w1 <<< $ops)
-        do
-            atlas .$i
+        do atlas .$i
         done
 
         atlas .sig
@@ -207,10 +207,10 @@
 #  ┌──────────── layer 3 ───────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .scan ]] && {
-        [[ $2 =~ a ]] && set -- $1 ${2}cofq
-        [[ $2 =~ r ]] && set -- $1 ${2}o
-        [[ $mods =~ q ]] && set -- $1 ${2}q
-        [[ $mods =~ n ]] || set -- $1 ${2//[$log]}
+        [[ $2 =~ a ]] && set . ${2}cofq
+        [[ $2 =~ r ]] && set . ${2}o
+        [[ $mods =~ q ]] && set . ${2}q
+        [[ $mods =~ n ]] || set . ${2//[$log]}
 
         atlas .pulse 1
 
@@ -297,7 +297,7 @@
                         echo -en "\r$bold( $c )$r"
                         sleep 0.05
                     done
-                done & pulse=$!
+                done &pulse=$!
             return;}
 
             kill $pulse
