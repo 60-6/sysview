@@ -6,7 +6,7 @@
 
     (( executing )) || {
         local executing=1 bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
-        local children core flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse log sig
+        local children core flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse log
         local -A delta lineage null
 
         echo
@@ -37,35 +37,40 @@
 #  ┌──────────── layer 2 ───────────────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .clarify ]] && {
-        echo "  q  ➜  quiet mode"
-        echo "  n  ➜  no cache"
-        echo "  c  ➜  view core packages"
-        echo "  o  ➜  view orphans"
-        echo "  f  ➜  view flatpak apps"
-        echo "  s  ➜  save state"
-        echo "  u  ➜  upgrade system"
-        echo "  d  ➜  view difference"
-        echo "  r  ➜  remove orphans"
+        echo -e "$bold ▼ atlas commands$r"
+        echo
+        echo "  ┌── modifiers ──────────────┐"
+        echo "  │ q  ·  quiet mode          │"
+        echo "  │ n  ·  no cache            │"
+        echo "  └───────────────────────────┘"
+        echo
+        echo "  ┌── operations ─────────────┐"
+        echo "  │ c  ·  view core           │"
+        echo "  │ o  ·  view orphans        │"
+        echo "  │ f  ·  view flatpaks       │"
+        echo "  │ s  ·  temporary save      │"
+        echo "  │ u  ·  upgrade system      │"
+        echo "  │ d  ·  view difference     │"
+        echo "  │ r  ·  remove orphans      │"
+        echo "  └───────────────────────────┘"
 
         kill -2 $$
     }
 
     [[ $1 = .sig ]] && {
         (( $2 )) && {
-            echo -en "$hc"
-            stty -echo
-
-            sig=$(trap -p 2)
             trap '
                 atlas .read
                 atlas .pulse
                 atlas .sig
-                echo -e "$red\r> atlas: terminated ⚠$r\e[K"
+                echo -e "\r$red> atlas: terminated ⚠$r\e[K"
                 kill -2 $$
-            ' 2
+            ' 2 15
+            echo -en "$hc"
+            stty -echo
         return;}
 
-        eval "${sig:-trap - 2}"
+        trap - 2 15
         echo -en "$sc"
         stty echo </dev/tty
     }
