@@ -60,7 +60,7 @@
                 atlas .read
                 atlas .pulse
                 atlas .sig
-                echo -e "$red\ratlas: terminated$r\e[K"
+                echo -e "$red\r> atlas: terminated ⚠$r\e[K"
                 kill -2 $$
             ' 2
         return;}
@@ -133,15 +133,17 @@
                 :;} || sudo pacman -Syu
             }
 
-            {
+            [[ $(command -v flatpak) ]] && {
+                echo
                 flatpak update
                 flatpak remove --unused
-            } 2>/dev/null
+            }
 
             log=
         }
 
         atlas .read
+        echo
     }
 
     [[ $1 = .d ]] && {
@@ -199,6 +201,7 @@
             }
 
             atlas .read
+            echo
         return;}
 
         [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
@@ -216,14 +219,14 @@
 
         {
             [[ $2 =~ [co] ]] && {
-                echo -en "$origin${dim}atlas: scanning orphans$r\e[K"
+                echo -en "$origin${dim}atlas: scanning orphans…$r\e[K"
 
                 orphans=( $(pacman -Qqtd) )
                 log+=o
             }
 
             [[ $2 =~ c ]] && {
-                echo -en "$origin${dim}atlas: scanning core$r\e[K"
+                echo -en "$origin${dim}atlas: scanning core…$r\e[K"
 
                 core=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
                 [[ $2 =~ q ]] || atlas .extract
@@ -231,7 +234,7 @@
             }
 
             [[ $2 =~ f ]] && {
-                echo -en "$origin${dim}atlas: scanning flatpaks$r\e[K"
+                echo -en "$origin${dim}atlas: scanning flatpaks…$r\e[K"
 
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
                 log+=f
@@ -282,7 +285,7 @@
         return;}
 
         stty -echo
-        echo -en "$hc\n"
+        echo -en "$hc"
     }
 
 #  ┌──────────── layer 4 ─────────────────────────────────────────────────────────────────────────┐
