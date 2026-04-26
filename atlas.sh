@@ -124,6 +124,7 @@
 
     [[ $1 = .u ]] && {
         [[ $ops =~ [^u] ]] && {
+            (( $(date +%s) - $(date -d "$(tac /var/log/pacman.log | grep -m1 'upgrade' | cut -c2-25)" +%s) < 333333 )) && return
             echo -en "scan for updates? (y/${bold}n$r) "
             atlas .read 1
         :;} || intent=y
