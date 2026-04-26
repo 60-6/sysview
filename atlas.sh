@@ -2,8 +2,6 @@
                                                                                                atlas()
 {
 
-#  ┌──────────── layer 0 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-
     (( executing )) || {
         local executing=1 bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
         local children core flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse log
@@ -13,11 +11,11 @@
         atlas .resolve "$*"
     }
 
-#  ┌──────────── layer 1 ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+#  ┌─── routing ──────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .resolve ]] && {
         set . ${2//[ -]}
-        [[ $2 =~ [^qncofsudr] ]] && atlas .clarify
+        [[ $2 =~ [^qncofsudr] ]] && atlas .syntax
         ops=${2//[qn]}
         mods=${2//[$ops]}
 
@@ -34,9 +32,7 @@
         atlas .sig
     }
 
-#  ┌──────────── layer 2 ───────────────────────────────────────────────────────────────────────────────────────────────┐
-
-    [[ $1 = .clarify ]] && {
+    [[ $1 = .syntax ]] && {
         echo -e "$bold ▼ atlas commands$r"
         echo
         echo "  ┌── modifiers ──────────────┐"
@@ -74,6 +70,10 @@
         echo -en "$sc"
         stty echo </dev/tty
     }
+
+#  └──────────────────────────────────────────────────────────────────────────────────────────────┘
+
+#  ┌── operations ────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .c ]] && {
         atlas .scan c
@@ -152,41 +152,26 @@
     }
 
     [[ $1 = .d ]] && {
-        atlas .scan a
-
         [[ ${save[@]} ]] || {
             echo -e "${dim}no save found$r\n"
         return;}
 
-        delta[core0]=$(grep -vxf <(printf "%s\n" "${core[@]}") <(echo "${save[core]}"))
-        delta[core1]=$(grep -vxf <(echo "${save[core]}") <(printf "%s\n" "${core[@]}"))
+        atlas .scan a
 
-        delta[orphans0]=$(grep -vxf <(printf "%s\n" "${orphans[@]}") <(echo "${save[orphans]}"))
-        delta[orphans1]=$(grep -vxf <(echo "${save[orphans]}") <(printf "%s\n" "${orphans[@]}"))
+        for i in core orphans flatpaks
+        do
+            local -n arr=$i
 
-        delta[flatpaks0]=$(grep -vxf <(printf "%s\n" "${flatpaks[@]}") <(echo "${save[flatpaks]}"))
-        delta[flatpaks1]=$(grep -vxf <(echo "${save[flatpaks]}") <(printf "%s\n" "${flatpaks[@]}"))
+            delta[${i}0]=$(grep -vxf <(printf "%s\n" "${arr[@]}") <(echo "${save[$i]}"))
+            delta[${i}1]=$(grep -vxf <(echo "${save[$i]}") <(printf "%s\n" "${arr[@]}"))
 
-        [[ ${delta[core0]}${delta[core1]} ]] && {
-            echo -e "${bold}core delta$r"
-            [[ ${delta[core0]} ]] && echo -e "$red${delta[core0]}$r"
-            [[ ${delta[core1]} ]] && echo -e "${delta[core1]}"
-            echo
-        }
-
-        [[ ${delta[orphans0]}${delta[orphans1]} ]] && {
-            echo -e "${bold}orphans delta$r"
-            [[ ${delta[orphans0]} ]] && echo -e "$red${delta[orphans0]}$r"
-            [[ ${delta[orphans1]} ]] && echo -e "${delta[orphans1]}"
-            echo
-        }
-
-        [[ ${delta[flatpaks0]}${delta[flatpaks1]} ]] && {
-            echo -e "${bold}flatpaks delta$r"
-            [[ ${delta[flatpaks0]} ]] && echo -e "$red${delta[flatpaks0]}$r"
-            [[ ${delta[flatpaks1]} ]] && echo -e "${delta[flatpaks1]}"
-            echo
-        }
+            [[ ${delta[${i}0]}${delta[${i}1]} ]] && {
+                echo -e "${bold}$i delta$r"
+                [[ ${delta[${i}0]} ]] && echo -e "$red${delta[${i}0]}$r"
+                [[ ${delta[${i}1]} ]] && echo -e "${delta[${i}1]}"
+                echo
+            }
+        done
 
         [[ $(printf "%s" "${delta[@]}") || $ops =~ [^sd] ]] || echo -e "${dim}nil$r\n"
     }
@@ -212,7 +197,9 @@
         [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
     }
 
-#  ┌──────────── layer 3 ───────────────────────────────────────────────────────────────────────────────────┐
+#  └──────────────────────────────────────────────────────────────────────────────────────────────┘
+
+#  ┌── engine ────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .scan ]] && {
         [[ $2 =~ a ]] && set . ${2}cofq
@@ -293,8 +280,6 @@
         echo -en "$hc"
     }
 
-#  ┌──────────── layer 4 ─────────────────────────────────────────────────────────────────────────┐
-
     [[ $1 = .pulse ]] && {
         {
             (( $2 )) && {
@@ -343,6 +328,8 @@
             }
         ')
     }
+
+#  └──────────────────────────────────────────────────────────────────────────────────────────────┘
 
 }
 
