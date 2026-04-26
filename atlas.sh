@@ -9,7 +9,7 @@
 
         echo
         atlas .resolve "$*"
-    }
+    return;}
 
 #  ┌─── routing ──────────────────────────────────────────────────────────────────────────────────┐
 
@@ -30,7 +30,7 @@
         done
 
         atlas .sig
-    }
+    return;}
 
     [[ $1 = .syntax ]] && {
         echo -e "$bold ▼ atlas commands$r"
@@ -51,7 +51,7 @@
         echo "  └───────────────────────────┘"
 
         kill -2 $$
-    }
+    return;}
 
     [[ $1 = .sig ]] && {
         (( $2 )) && {
@@ -69,7 +69,7 @@
         trap - 2 15
         echo -en "$sc"
         stty echo </dev/tty
-    }
+    return;}
 
 #  └──────────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -82,7 +82,7 @@
         local -n arr=core
         local -n assoca=lineage
         atlas .render
-    }
+    return;}
 
     [[ $1 = .o ]] && {
         atlas .scan o
@@ -95,7 +95,7 @@
         return;}
 
         [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
-    }
+    return;}
 
     [[ $1 = .f ]] && {
         atlas .scan f
@@ -108,7 +108,7 @@
         return;}
 
         [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
-    }
+    return;}
 
     [[ $1 = .s ]] && {
         atlas .scan a
@@ -120,7 +120,7 @@
         save[flatpaks]=$(printf "%s\n" "${flatpaks[@]}")
 
         [[ $ops =~ [^s] ]] || echo -e "${dim}saved$r\n"
-    }
+    return;}
 
     [[ $1 = .u ]] && {
         [[ $ops =~ [^u] ]] && {
@@ -149,7 +149,7 @@
 
         atlas .read
         echo
-    }
+    return;}
 
     [[ $1 = .d ]] && {
         [[ ${save[@]} ]] || {
@@ -174,7 +174,7 @@
         done
 
         [[ $(printf "%s" "${delta[@]}") || $ops =~ [^sd] ]] || echo -e "${dim}nil$r\n"
-    }
+    return;}
 
     [[ $1 = .r ]] && {
         atlas .scan o
@@ -195,7 +195,7 @@
         return;}
 
         [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
-    }
+    return;}
 
 #  └──────────────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -234,7 +234,7 @@
         } 2>/dev/null
 
         atlas .pulse
-    }
+    return;}
 
     [[ $1 = .render ]] && {
         for i in ${!arr[@]}
@@ -263,7 +263,7 @@
         done
 
         echo
-    }
+    return;}
 
     [[ $1 = .read ]] && {
         (( $2 )) && {
@@ -278,7 +278,7 @@
 
         stty -echo
         echo -en "$hc"
-    }
+    return;}
 
     [[ $1 = .pulse ]] && {
         {
@@ -297,7 +297,7 @@
             wait $pulse
             echo -en "\r\e[K"
         } 2>/dev/null
-    }
+    return;}
 
     [[ $1 = .extract ]] && {
         lineage=()
@@ -327,7 +327,7 @@
                 proceed = 1
             }
         ')
-    }
+    return;}
 
 #  └──────────────────────────────────────────────────────────────────────────────────────────────┘
 
