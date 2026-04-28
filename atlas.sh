@@ -5,7 +5,7 @@
     (( executing )) || {
         local executing=1 bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
         local children core flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse log
-        local -A delta lineage null
+        local -A delta lineage modified null
 
         echo
         atlas .resolve "$*"
@@ -14,14 +14,14 @@
 #  ┌─── routing ──────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .resolve ]] && {
-        set . ${2//[ -]}
+        set 0 ${2//[ -]}
         [[ $2 =~ [^qncofsudr] ]] && atlas .syntax
         ops=${2//[qn]}
         mods=${2//[$ops]}
 
-        [[ $ops ]] || ops=cofsudr
+        [[ $ops ]] && mods+=e || ops=cofsudr
 
-        atlas .sig 1
+        atlas .sig
 
         [[ $mods =~ n ]] || atlas .scan $2
 
@@ -29,7 +29,7 @@
         do atlas .$i
         done
 
-        atlas .sig
+        atlas .sig 0
     return;}
 
     [[ $1 = .syntax ]] && {
@@ -54,21 +54,21 @@
     return;}
 
     [[ $1 = .sig ]] && {
-        (( $2 )) && {
-            trap '
-                atlas .read
-                atlas .pulse
-                atlas .sig
-                echo -e "\r$red> atlas: terminated ⚠$r\e[K"
-                kill -2 $$
-            ' 2 15
-            echo -en "$hc"
-            stty -echo
+        [[ $2 ]] && {
+            trap - 2 15
+            echo -en "$sc"
+            stty echo </dev/tty
         return;}
 
-        trap - 2 15
-        echo -en "$sc"
-        stty echo </dev/tty
+        trap '
+            atlas .read 0
+            atlas .pulse 0
+            atlas .sig 0
+            echo -e "\r$red> atlas: terminated ⚠$r\e[K"
+            kill -2 $$
+        ' 2 15
+        echo -en "$hc"
+        stty -echo
     return;}
 
 #  └──────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -94,7 +94,7 @@
             atlas .render $red
         return;}
 
-        [[ $ops =~ [^o] ]] || echo -e "${dim}nil$r\n"
+        [[ $mods =~ e ]] && echo -e "${dim}orphans: nil$r\n"
     return;}
 
     [[ $1 = .f ]] && {
@@ -107,7 +107,7 @@
             atlas .render
         return;}
 
-        [[ $ops =~ [^f] ]] || echo -e "${dim}nil$r\n"
+        [[ $mods =~ e ]] && echo -e "${dim}flatpaks: nil$r\n"
     return;}
 
     [[ $1 = .s ]] && {
@@ -119,15 +119,15 @@
         save[orphans]=$(printf "%s\n" "${orphans[@]}")
         save[flatpaks]=$(printf "%s\n" "${flatpaks[@]}")
 
-        [[ $ops =~ [^s] ]] || echo -e "${dim}saved$r\n"
+        [[ $mods =~ e ]] && echo -e "${dim}saved$r\n"
     return;}
 
     [[ $1 = .u ]] && {
-        [[ $ops =~ [^u] ]] && {
-            [[ $(tac /var/log/pacman.log | grep -m1 upgrade) > [$(date -d -3days +%F) ]] && return
+        [[ $mods =~ e ]] && intent=y || {
+            [[ $(tac /var/log/pacman.log | grep -m1 upgrade) > [$(date -d -3days +%F) ]] 2>/dev/null && return
             echo -en "scan for updates? (y/${bold}n$r) "
-            atlas .read 1
-        :;} || intent=y
+            atlas .read
+        }
 
         [[ ${intent,,} = y ]] && {
 
@@ -144,11 +144,9 @@
                 flatpak update
                 flatpak remove --unused
             }
-
-            log=
         }
 
-        atlas .read
+        atlas .read 0
         echo
     return;}
 
@@ -174,28 +172,25 @@
             }
         done
 
-        [[ $(printf "%s" "${delta[@]}") || $ops =~ [^sd] ]] || echo -e "${dim}nil$r\n"
+        [[ $mods =~ e  && ! ${delta[@]} =~ [^\ ] ]] && echo -e "${dim}delta: nil$r\n"
     return;}
 
     [[ $1 = .r ]] && {
         atlas .scan o
 
         [[ $orphans ]] && {
-            [[ $ops =~ [^r] ]] && {
+            [[ $mods =~ e ]] && intent=y || {
                 echo -en "remove orphans? (y/${bold}n$r) "
-                atlas .read 1
-            :;} || intent=y
-
-            [[ ${intent,,} = y ]] && {
-                sudo pacman -Rns ${orphans[@]}
-                log=${log//o}
+                atlas .read
             }
 
-            atlas .read
+            [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[@]}
+
+            atlas .read 0
             echo
         return;}
 
-        [[ $ops =~ [^r] ]] || echo -e "${dim}nil$r\n"
+        [[ $mods =~ e ]] && echo -e "${dim}no orphans to remove$r\n"
     return;}
 
 #  └──────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -203,12 +198,27 @@
 #  ┌── engine ────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .scan ]] && {
-        [[ $2 =~ a ]] && set . ${2}cofq
-        [[ $2 =~ r ]] && set . ${2}o
-        [[ $mods =~ q ]] && set . ${2}q
-        [[ $mods =~ n ]] || set . ${2//[$log]}
+        {
+            modified[p1]=$(stat -c %Y /var/log/pacman.log)
+            modified[f1]=$(stat -c %Y /var/lib/flatpak)
+        } 2>/dev/null
 
-        atlas .pulse 1
+        [[ ${modified[p0]} && ${modified[p0]} = ${modified[p1]} ]] || {
+            log=${log//[co]}
+            modified[p0]=${modified[p1]}
+        }
+
+        [[ ${modified[f0]} && ${modified[f0]} = ${modified[f1]} ]] || {
+            log=${log//f}
+            modified[f0]=${modified[f1]}
+        }
+
+        [[ $2 =~ a ]] && set 0 ${2}cofq
+        [[ $2 =~ r ]] && set 0 ${2}o
+        [[ $mods =~ q ]] && set 0 ${2}q
+        [[ $mods =~ n ]] || set 0 ${2//[$log]}
+
+        atlas .pulse
 
         {
             [[ $2 =~ [co] ]] && {
@@ -234,7 +244,7 @@
             }
         } 2>/dev/null
 
-        atlas .pulse
+        atlas .pulse 0
     return;}
 
     [[ $1 = .render ]] && {
@@ -267,36 +277,36 @@
     return;}
 
     [[ $1 = .read ]] && {
-        (( $2 )) && {
-            while read -t 0 intent
-            do read intent
-            done
-
-            echo -en "$sc"
-            stty echo
-            read intent
+        [[ $2 ]] && {
+            stty -echo
+            echo -en "$hc"
         return;}
 
-        stty -echo
-        echo -en "$hc"
+        while read -t 0 intent
+        do read intent
+        done
+
+        echo -en "$sc"
+        stty echo
+        read intent
     return;}
 
     [[ $1 = .pulse ]] && {
         {
-            (( $2 )) && {
-                while :
-                do
-                    for c in '/' '—' '\' '|'
-                    do
-                        echo -en "\r$bold( $c )$r"
-                        sleep 0.05
-                    done
-                done &pulse=$!
+            [[ $2 ]] && {
+                kill $pulse
+                wait $pulse
+                echo -en "\r\e[K"
             return;}
 
-            kill $pulse
-            wait $pulse
-            echo -en "\r\e[K"
+            while :
+            do
+                for c in '/' '—' '\' '|'
+                do
+                    echo -en "\r$bold( $c )$r"
+                    sleep 0.05
+                done
+            done &pulse=$!
         } 2>/dev/null
     return;}
 
