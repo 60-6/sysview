@@ -4,7 +4,7 @@
 
     (( executing )) || {
         local executing=1 bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
-        local children core flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse log
+        local children flatpaks i ii indent intent last lastc mods opt ops orphans pfx pkg pulse root log
         local -A delta lineage modified null
 
         echo
@@ -15,11 +15,11 @@
 
     [[ $1 = .resolve ]] && {
         set 0 ${2//[ -]}
-        [[ $2 =~ [^qncofsudr] ]] && atlas .syntax
+        [[ $2 =~ [^qnrofsudc] ]] && atlas .syntax
         ops=${2//[qn]}
         mods=${2//[$ops]}
 
-        [[ $ops ]] && mods+=e || ops=cofsudr
+        [[ $ops ]] && mods+=e || ops=rofsudc
 
         atlas .sig
 
@@ -37,17 +37,17 @@
         echo
         echo "  ┌── modifiers ──────────────┐"
         echo "  │ q  ·  quiet mode          │"
-        echo "  │ n  ·  no cache            │"
+        echo "  │ n  ·  no log              │"
         echo "  └───────────────────────────┘"
         echo
         echo "  ┌── operations ─────────────┐"
-        echo "  │ c  ·  view core           │"
+        echo "  │ r  ·  view root           │"
         echo "  │ o  ·  view orphans        │"
         echo "  │ f  ·  view flatpaks       │"
         echo "  │ s  ·  temporary save      │"
         echo "  │ u  ·  upgrade system      │"
         echo "  │ d  ·  view difference     │"
-        echo "  │ r  ·  remove orphans      │"
+        echo "  │ c  ·  cleanup orphans     │"
         echo "  └───────────────────────────┘"
 
         kill -2 $$
@@ -75,11 +75,11 @@
 
 #  ┌── operations ────────────────────────────────────────────────────────────────────────────────┐
 
-    [[ $1 = .c ]] && {
-        atlas .scan c
+    [[ $1 = .r ]] && {
+        atlas .scan r
 
-        echo -e "${bold}core (${#core[@]})$r"
-        local -n arr=core
+        echo -e "${bold}root (${#root[@]})$r"
+        local -n arr=root
         local -n assoca=lineage
         atlas .render
     return;}
@@ -115,7 +115,7 @@
 
         declare -gA save
 
-        save[core]=$(printf "%s\n" "${core[@]}")
+        save[root]=$(printf "%s\n" "${root[@]}")
         save[orphans]=$(printf "%s\n" "${orphans[@]}")
         save[flatpaks]=$(printf "%s\n" "${flatpaks[@]}")
 
@@ -157,7 +157,7 @@
 
         atlas .scan a
 
-        for i in core orphans flatpaks
+        for i in root orphans flatpaks
         do
             local -n arr=$i
 
@@ -172,10 +172,10 @@
             }
         done
 
-        [[ $mods =~ e  && ! ${delta[@]} =~ [^\ ] ]] && echo -e "${dim}delta: nil$r\n"
+        [[ $mods =~ e  && ${delta[@]} =~ ^\ *$ ]] && echo -e "${dim}delta: nil$r\n"
     return;}
 
-    [[ $1 = .r ]] && {
+    [[ $1 = .c ]] && {
         atlas .scan o
 
         [[ $orphans ]] && {
@@ -204,7 +204,7 @@
         } 2>/dev/null
 
         [[ ${modified[p0]} && ${modified[p0]} = ${modified[p1]} ]] || {
-            log=${log//[co]}
+            log=${log//[ro]}
             modified[p0]=${modified[p1]}
         }
 
@@ -213,27 +213,27 @@
             modified[f0]=${modified[f1]}
         }
 
-        [[ $2 =~ a ]] && set 0 ${2}cofq
-        [[ $2 =~ r ]] && set 0 ${2}o
+        [[ $2 =~ a ]] && set 0 ${2}rofq
+        [[ $2 =~ c ]] && set 0 ${2}o
         [[ $mods =~ q ]] && set 0 ${2}q
         [[ $mods =~ n ]] || set 0 ${2//[$log]}
 
         atlas .pulse
 
         {
-            [[ $2 =~ [co] ]] && {
+            [[ $2 =~ [ro] ]] && {
                 echo -en "$origin${dim}atlas: scanning orphans…$r\e[K"
 
                 orphans=( $(pacman -Qqtd) )
                 log+=o
             }
 
-            [[ $2 =~ c ]] && {
-                echo -en "$origin${dim}atlas: scanning core…$r\e[K"
+            [[ $2 =~ r ]] && {
+                echo -en "$origin${dim}atlas: scanning root…$r\e[K"
 
-                core=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
+                root=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
                 [[ $2 =~ q ]] || atlas .extract
-                log+=c
+                log+=r
             }
 
             [[ $2 =~ f ]] && {
@@ -314,8 +314,8 @@
         lineage=()
 
         while read pkg opt
-        do [[ " ${core[@]} " =~ " $opt " ]] && lineage[$pkg]+="$opt "
-        done < <(LC_ALL=C pacman -Qi ${core[@]} | awk '
+        do [[ " ${root[@]} " =~ " $opt " ]] && lineage[$pkg]+="$opt "
+        done < <(LC_ALL=C pacman -Qi ${root[@]} | awk '
             proceed {
                 if (/^ /) {
                     gsub(/^ +|:.*/, "")
