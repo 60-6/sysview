@@ -120,7 +120,7 @@
 
     [[ $1 = .u ]] && {
         [[ $cmds =~ i ]] && {
-            [[ $(tac /var/log/pacman.log 2>/dev/null | grep -m1 upgrade) > [$(date -d -3days +%F) ]] && return
+            [[ $(tac /var/log/pacman.log 2>/dev/null | grep -m1 "system upgrade") > [$(date -d -3days +%F) ]] && return
             echo -en "scan for updates? (y/${bold}n$r) "
             atlas .read - -
         :;} || {
