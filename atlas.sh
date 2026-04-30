@@ -98,7 +98,7 @@
             [[ $cmds =~ i ]] || echo -e "${dim}orphans: nil$r\n"
         return;}
 
-        echo -e "$bold${red}orphans (${#orphans[@]})$r"
+        echo -e "$red${bold}orphans (${#orphans[@]})$r"
         local -n arr=orphans
         local -n assoca=null
         atlas .render $red
