@@ -3,9 +3,10 @@
 {
 
     (( executing )) || {
-        local executing=1 cmds=$* bold="\e[1m" dim="\e[2m" red="\e[31m" r="\e[m" hc="\e[?25l" sc="\e[?25h" origin="\e[7G"
-        local children flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse root log
+        local executing=1 cmds=$*
         local -A delta lineage modified null
+        local children flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse root log
+        local bold="\e[1m" dim="\e[2m" red="\e[31m" h="\e[?25l" s="\e[?25h" r="\e[m" c="\e[K" o="\e[7G"
 
         echo
         atlas .resolve
@@ -30,33 +31,34 @@
     }
 
     [[ $1 = .syntax ]] && {
-        echo -e "$bold ▼ atlas commands$r"
+        echo -en $bold
+        echo           " ▼ atlas commands"
+        echo -en $r
+        echo           "  ┌── modifiers ──────────────┐"
+        echo           "  │ q  ·  quiet output        │"
+        echo           "  │ i  ·  implicit mode       │"
+        echo           "  │ n  ·  no caching          │"
+        echo           "  └───────────────────────────┘"
         echo
-        echo "  ┌── modifiers ──────────────┐"
-        echo "  │ q  ·  quiet output        │"
-        echo "  │ i  ·  implicit mode       │"
-        echo "  │ n  ·  no caching          │"
-        echo "  └───────────────────────────┘"
-        echo
-        echo "  ┌── operations ─────────────┐"
-        echo "  │ r  ·  view root           │"
-        echo "  │ f  ·  view flatpaks       │"
-        echo "  │ o  ·  view orphans        │"
-        echo "  │ s  ·  temporary save      │"
-        echo "  │ u  ·  upgrade system      │"
-        echo "  │ d  ·  view difference     │"
-        echo "  │ c  ·  cleanup orphans     │"
-        echo "  └───────────────────────────┘"
-
+        echo           "  ┌── operations ─────────────┐"
+        echo           "  │ r  ·  view root           │"
+        echo           "  │ f  ·  view flatpaks       │"
+        echo           "  │ o  ·  view orphans        │"
+        echo           "  │ s  ·  temporary save      │"
+        echo           "  │ u  ·  upgrade system      │"
+        echo           "  │ d  ·  view difference     │"
+        echo           "  │ c  ·  cleanup orphans     │"
+        echo           "  └───────────────────────────┘"
         kill -2 $$
     }
 
     [[ $1 = .sig ]] && {
         [[ $2 ]] && {
+            atlas .read
             trap '
                 atlas .pulse
                 atlas .sig
-                echo -e "\r$red> atlas: terminated ⚠$r\e[K"
+                echo -e "\r$red> atlas: terminated ⚠$r$c"
                 kill -2 $$
             ' 2 15
         return;}
@@ -198,7 +200,7 @@
 
     [[ $1 = .read ]] && {
         [[ $2 ]] && {
-            echo -en "$sc"
+            echo -en $s
             stty echo </dev/tty
 
             [[ $3 ]] && {
@@ -210,7 +212,7 @@
         return;}
 
         stty -echo
-        echo -en "$hc"
+        echo -en $h
     }
 
     [[ $1 = .scan ]] && {
@@ -229,7 +231,7 @@
             modified[f0]=${modified[f1]}
         }
 
-        [[ $2 =~ a ]] && set $1 ${2}qrfo
+        [[ $2 =~ a ]] && set $1 qrfo
         [[ $2 =~ c ]] && set $1 ${2}o
 
         [[ $cmds =~ n ]] || set $1 ${2//[$log]}
@@ -238,20 +240,20 @@
 
         {
             [[ $2 =~ [ro] ]] && {
-                echo -en "$origin${dim}atlas: scanning orphans…$r\e[K"
+                echo -en "$o${dim}atlas: scanning orphans…$r$c"
                 orphans=( $(pacman -Qqtd) )
                 log+=o
             }
 
             [[ $2 =~ r ]] && {
-                echo -en "$origin${dim}atlas: scanning root…$r\e[K"
+                echo -en "$o${dim}atlas: scanning root…$r$c"
                 root=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
                 [[ $2 =~ q || $cmds =~ q ]] || atlas .extract
                 log+=r
             }
 
             [[ $2 =~ f ]] && {
-                echo -en "$origin${dim}atlas: scanning flatpaks…$r\e[K"
+                echo -en "$o${dim}atlas: scanning flatpaks…$r$c"
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
                 log+=f
             }
@@ -275,7 +277,7 @@
 
             kill $pulse
             wait $pulse
-            echo -en "\r\e[K"
+            echo -en "\r$c"
         } 2>/dev/null
     }
 
