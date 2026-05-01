@@ -1,9 +1,8 @@
 # atlas
-arch linux system monitor and maintenance tool
+arch linux system monitor and maintenance tool packaged as a single bash function
 
-## usage
-it is a single bash function you can paste at the end of .bashrc, no installation needed
+you can use it by pasting it at the end of .bashrc
 
 doesn't leave any traces behind
 
-"atlas ?" for extra options
+"atlas ?" for help
