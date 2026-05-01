@@ -2,22 +2,33 @@
                                                                                                atlas()
 {
 
+#  ┌── directives ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+
+    local default_commands=irfosudc
+    local update_interval=3
+    local cache_limit=5
+
+#  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+#  ┌── execution ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+
     (( executing )) || {
         local executing=1 cmds=$*
         local -A delta lineage modified null
-        local children flatpaks i ii indent intent last lastc opt orphans pfx pkg pulse root log
-        local bold="\e[1m" dim="\e[2m" red="\e[31m" h="\e[?25l" s="\e[?25h" r="\e[m" c="\e[K" o="\e[7G"
+        local children csize flatpaks i ii indent last lastc log opt orphans pfx pkg pulse root
+        local bold=$'\e[1m' dim=$'\e[2m' red=$'\e[31m' reset=$'\e[m' n=$'\n' r=$'\r' c=$'\e[K' h=$'\e[?25l' s=$'\e[?25h' o=$'\e[7G'
 
         echo
         atlas .resolve
     }
 
-#  ┌── control ───────────────────────────────────────────────────────────────────────────────────┐
+#  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+#  ┌── routing ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .resolve ]] && {
-        cmds=${cmds//[ -]}
-        [[ $cmds =~ [^qinrfosudc] ]] && atlas .syntax
-        [[ ${cmds//[qin]} ]] || cmds+=irfosudc
+        [[ $cmds =~ [^-\ qinrfosudc] ]] && atlas .syntax
+        [[ ${cmds//[qin]} ]] || cmds+=$default_commands
 
         atlas .sig -
 
@@ -31,50 +42,49 @@
     }
 
     [[ $1 = .syntax ]] && {
-        echo -en $bold
-        echo           " ▼ atlas commands"
-        echo -en $r
-        echo           "  ┌── modifiers ──────────────┐"
-        echo           "  │ q  ·  quiet output        │"
-        echo           "  │ i  ·  implicit mode       │"
-        echo           "  │ n  ·  no caching          │"
-        echo           "  └───────────────────────────┘"
+        echo  $bold  " ▼ atlas commands"
+        echo  $reset
+        echo         "  ┌── modifiers ──────────────┐"
+        echo         "  │ q  ·  quiet output        │"
+        echo         "  │ i  ·  implicit mode       │"
+        echo         "  │ n  ·  no scan caching     │"
+        echo         "  └───────────────────────────┘"
         echo
-        echo           "  ┌── operations ─────────────┐"
-        echo           "  │ r  ·  view root           │"
-        echo           "  │ f  ·  view flatpaks       │"
-        echo           "  │ o  ·  view orphans        │"
-        echo           "  │ s  ·  temporary save      │"
-        echo           "  │ u  ·  upgrade system      │"
-        echo           "  │ d  ·  view difference     │"
-        echo           "  │ c  ·  cleanup orphans     │"
-        echo           "  └───────────────────────────┘"
+        echo         "  ┌── operations ─────────────┐"
+        echo         "  │ r  ·  view root           │"
+        echo         "  │ f  ·  view flatpaks       │"
+        echo         "  │ o  ·  view orphans        │"
+        echo         "  │ s  ·  temporary save      │"
+        echo         "  │ u  ·  upgrade system      │"
+        echo         "  │ d  ·  view difference     │"
+        echo         "  │ c  ·  cleanup orphans     │"
+        echo         "  └───────────────────────────┘"
         kill -2 $$
     }
 
     [[ $1 = .sig ]] && {
         [[ $2 ]] && {
-            atlas .read
+            atlas .await
             trap '
                 atlas .pulse
                 atlas .sig
-                echo -e "\r$red> atlas: terminated ⚠$r$c"
+                echo "$r$red> atlas: terminated ⚠$reset$c"
                 kill -2 $$
             ' 2 15
         return;}
 
-        atlas .read -
+        atlas .await -
         trap - 2 15
     }
 
-#  └──────────────────────────────────────────────────────────────────────────────────────────────┘
+#  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-#  ┌── operations ────────────────────────────────────────────────────────────────────────────────┐
+#  ┌── operations ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .r ]] && {
         atlas .scan r
 
-        echo -e "${bold}root (${#root[@]})$r"
+        echo "${bold}root (${#root[@]})$reset"
         local -n arr=root
         local -n assoca=lineage
         atlas .render
@@ -84,10 +94,10 @@
         atlas .scan f
 
         [[ $flatpaks ]] || {
-            [[ $cmds =~ i ]] || echo -e "${dim}flatpaks: nil$r\n"
+            [[ $cmds =~ i ]] || echo "${dim}flatpaks: nil$reset$n"
         return;}
 
-        echo -e "${bold}flatpaks (${#flatpaks[@]})$r"
+        echo "${bold}flatpaks (${#flatpaks[@]})$reset"
         local -n arr=flatpaks
         local -n assoca=null
         atlas .render
@@ -97,39 +107,34 @@
         atlas .scan o
 
         [[ $orphans ]] || {
-            [[ $cmds =~ i ]] || echo -e "${dim}orphans: nil$r\n"
+            [[ $cmds =~ i ]] || echo "${dim}orphans: nil$reset$n"
         return;}
 
-        echo -e "$red${bold}orphans (${#orphans[@]})$r"
+        echo "$red${bold}orphans (${#orphans[@]})$reset"
         local -n arr=orphans
         local -n assoca=null
         atlas .render $red
     }
 
     [[ $1 = .s ]] && {
-        atlas .scan a
+        atlas .scan s
 
         declare -gA save
 
-        save[root]=$(printf "%s\n" "${root[@]}")
-        save[flatpaks]=$(printf "%s\n" "${flatpaks[@]}")
-        save[orphans]=$(printf "%s\n" "${orphans[@]}")
+        save[root]=$(printf "%s$n" "${root[@]}")
+        save[flatpaks]=$(printf "%s$n" "${flatpaks[@]}")
+        save[orphans]=$(printf "%s$n" "${orphans[@]}")
 
-        [[ $cmds =~ i ]] || echo -e "${dim}saved$r\n"
+        [[ $cmds =~ i ]] || echo "${dim}saved$reset$n"
     }
 
     [[ $1 = .u ]] && {
-        [[ $cmds =~ i ]] && {
-            [[ $(tac /var/log/pacman.log 2>/dev/null | grep -m1 "system upgrade") > [$(date -d -3days +%F) ]] && return
-            echo -en "scan for updates? (y/${bold}n$r) "
-            atlas .read - -
-        :;} || {
-            intent=y
-            atlas .read -
-        }
+        [[ $cmds =~ i && $(tac /var/log/pacman.log 2>/dev/null | grep -m1 "system upgrade") > [$(date -d -${update_interval}days +%F) ]] && return
 
-        [[ ${intent,,} = y ]] && {
+        echo -n "scan for updates? (y/${bold}n$reset) "
+        atlas .await - -
 
+        [[ ${REPLY,,} = y ]] && {
             [[ $(command -v yay) ]] && {
                 yay
             :;} || {
@@ -144,116 +149,130 @@
             }
         }
 
-        atlas .read
         echo
+        atlas .await
     }
 
     [[ $1 = .d ]] && {
         [[ ${save[@]} ]] || {
-            echo -e "${dim}no save found$r\n"
+            echo "${dim}no save found$reset$n"
         return;}
 
-        atlas .scan a
+        atlas .scan d
 
         for i in root flatpaks orphans
         do
             local -n arr=$i
 
-            delta[${i}0]=$(grep -vxf <(printf "%s\n" "${arr[@]}") <(echo "${save[$i]}"))
-            delta[${i}1]=$(grep -vxf <(echo "${save[$i]}") <(printf "%s\n" "${arr[@]}"))
+            delta[${i}0]=$(grep -vxf <(printf "%s$n" "${arr[@]}") <(echo "${save[$i]}"))
+            delta[${i}1]=$(grep -vxf <(echo "${save[$i]}") <(printf "%s$n" "${arr[@]}"))
 
             [[ ${delta[${i}0]}${delta[${i}1]} ]] && {
-                echo -e "${bold}$i delta$r"
-                [[ ${delta[${i}0]} ]] && echo -e "$red${delta[${i}0]}$r"
-                [[ ${delta[${i}1]} ]] && echo -e "${delta[${i}1]}"
+                echo "${bold}$i delta$reset"
+                [[ ${delta[${i}0]} ]] && echo "$red${delta[${i}0]}$reset"
+                [[ ${delta[${i}1]} ]] && echo "${delta[${i}1]}"
                 echo
             }
         done
 
-        [[ $cmds =~ i || ${delta[@]} =~ [^\ ] ]] || echo -e "${dim}delta: nil$r\n"
+        [[ $cmds =~ i || ${delta[@]} =~ [^\ ] ]] || echo "${dim}delta: nil$reset$n"
     }
 
     [[ $1 = .c ]] && {
         atlas .scan o
 
-        [[ $orphans ]] || {
-            [[ $cmds =~ i ]] || echo -e "${dim}no orphans to remove$r\n"
-        return;}
+        [[ $orphans ]] && {
+            echo -n "remove orphans? (y/${bold}n$reset) "
+            atlas .await - -
 
-        [[ $cmds =~ i ]] && {
-            echo -en "remove orphans? (y/${bold}n$r) "
-            atlas .read - -
+            [[ ${REPLY,,} = y ]] && sudo pacman -Rns ${orphans[@]}
+
+            echo
+            atlas .await
         :;} || {
-            intent=y
-            atlas .read -
+            [[ $cmds =~ i ]] || echo "${dim}no orphans to remove$reset$n"
         }
 
-        [[ ${intent,,} = y ]] && sudo pacman -Rns ${orphans[@]}
+        csize=$(du -sh /var/cache/pacman/pkg/ 2>/dev/null | cut -f1)
 
-        atlas .read
+        [[ $csize ]] || {
+            [[ $cmds =~ i ]] || echo "${dim}cache directory not found$reset$n"
+        return;}
+
+        [[ $cmds =~ i ]] && (( $(numfmt --from=iec $csize) < $cache_limit<<30 )) && return
+
+        echo -n "clear package cache [$csize]? (y/${bold}n$reset) "
+        atlas .await - -
+
+        [[ ${REPLY,,} = y ]] && yes | sudo pacman -Scc &>/dev/null
+
         echo
+        atlas .await
     }
 
-#  └──────────────────────────────────────────────────────────────────────────────────────────────┘
+#  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-#  ┌── internal ──────────────────────────────────────────────────────────────────────────────────┐
+#  ┌── engine ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
-    [[ $1 = .read ]] && {
+    [[ $1 = .await ]] && {
         [[ $2 ]] && {
-            echo -en $s
+            echo -n $s
             stty echo </dev/tty
 
             [[ $3 ]] && {
-                while read -t 0 intent
-                do read intent
+                while read -t 0
+                do read
                 done
-                read intent
+                read
             }
         return;}
 
         stty -echo
-        echo -en $h
+        echo -n $h
     }
 
     [[ $1 = .scan ]] && {
-        {
-            modified[p1]=$(stat -c %Y /var/log/pacman.log)
-            modified[f1]=$(stat -c %Y /var/lib/flatpak)
-        } 2>/dev/null
-
-        [[ ${modified[p0]} && ${modified[p0]} = ${modified[p1]} ]] || {
-            log=${log//[ro]}
-            modified[p0]=${modified[p1]}
-        }
-
-        [[ ${modified[f0]} && ${modified[f0]} = ${modified[f1]} ]] || {
-            log=${log//f}
-            modified[f0]=${modified[f1]}
-        }
-
-        [[ $2 =~ a ]] && set $1 qrfo
+        [[ $cmds =~ q ]] && set $1 ${2}q
+        [[ $2 =~ [sd] ]] && set $1 qrfo
         [[ $2 =~ c ]] && set $1 ${2}o
 
-        [[ $cmds =~ n ]] || set $1 ${2//[$log]}
+        [[ $cmds =~ n ]] || {
+            {
+                modified[p1]=$(stat -c %Y /var/log/pacman.log)
+                modified[f1]=$(stat -c %Y /var/lib/flatpak)
+            } 2>/dev/null
+
+            [[ ${modified[p0]} && ${modified[p0]} = ${modified[p1]} ]] || {
+                log=${log//[ro]}
+                modified[p0]=${modified[p1]}
+            }
+
+            [[ ${modified[f0]} && ${modified[f0]} = ${modified[f1]} ]] || {
+                log=${log//f}
+                modified[f0]=${modified[f1]}
+            }
+
+            set $1 ${2//[$log]}
+        }
 
         atlas .pulse -
 
         {
             [[ $2 =~ [ro] ]] && {
-                echo -en "$o${dim}atlas: scanning orphans…$r$c"
+                echo -n "$o${dim}atlas: scanning orphans…$reset"
                 orphans=( $(pacman -Qqtd) )
                 log+=o
             }
 
             [[ $2 =~ r ]] && {
-                echo -en "$o${dim}atlas: scanning root…$r$c"
-                root=( $(grep -vxf <(printf "%s\n" "${orphans[@]}") <(pacman -Qqtt)) )
-                [[ $2 =~ q || $cmds =~ q ]] || atlas .extract
+                echo -n "$o${dim}atlas: scanning root…$reset$c"
+                root=( $(grep -vxf <(printf "%s$n" "${orphans[@]}") <(pacman -Qqtt)) )
+                [[ $2 =~ q ]] || atlas .extract
                 log+=r
             }
 
             [[ $2 =~ f ]] && {
-                echo -en "$o${dim}atlas: scanning flatpaks…$r$c"
+                echo -n "$o${dim}atlas: scanning flatpaks…$reset$c"
                 mapfile -t flatpaks < <(flatpak list --app --columns=name)
                 log+=f
             }
@@ -267,9 +286,9 @@
             [[ $2 ]] && {
                 while :
                 do
-                    for c in '/' '—' '\' '|'
+                    for f in '/' '—' '\' '|'
                     do
-                        echo -en "\r$bold( $c )$r"
+                        echo -n "$r$bold( $f )$reset"
                         sleep 0.05
                     done
                 done &pulse=$!
@@ -277,7 +296,7 @@
 
             kill $pulse
             wait $pulse
-            echo -en "\r$c"
+            echo -n "$r$c"
         } 2>/dev/null
     }
 
@@ -318,10 +337,10 @@
 
             last=$(( i == ${#arr[@]} - 1 ))
             [[ $cmds =~ q ]] || {
-                (( last )) && pfx="│\n└─ " || pfx="│\n├─ "
+                (( last )) && pfx="│$n└─ " || pfx="│$n├─ "
             }
 
-            echo -e "$2$pfx$pkg$r"
+            echo "$2$pfx$pkg$reset"
 
             children=( ${assoca[$pkg]} )
 
@@ -333,14 +352,14 @@
                 (( last )) && indent="   " || indent="│  "
                 (( lastc )) && pfx="└─ " || pfx="├─ "
 
-                echo -e "$2$indent$dim$pfx$pkg$r"
+                echo "$2$indent$dim$pfx$pkg$reset"
             done
         done
 
         echo
     }
 
-#  └──────────────────────────────────────────────────────────────────────────────────────────────┘
+#  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 }
 
