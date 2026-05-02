@@ -232,9 +232,10 @@
     }
 
     [[ $1 = .scan ]] && {
-        [[ $cmds =~ q ]] && set $1 ${2}q
-        [[ $2 =~ [sd] ]] && set $1 qrfo
-        [[ $2 =~ c ]] && set $1 ${2}o
+        [[ $2 =~ r ]] && set 0 $2re
+        [[ $2 =~ c ]] && set 0 $2o
+        [[ $2 =~ [sd] ]] && set 0 $2rfo
+        [[ $cmds =~ q ]] && set 0 ${2//e}
 
         [[ $cmds =~ n ]] || {
             {
@@ -252,7 +253,7 @@
                 modified[f0]=${modified[f1]}
             }
 
-            set $1 ${2//[$log]}
+            set 0 ${2//[$log]}
         }
 
         atlas .pulse -
@@ -267,7 +268,7 @@
             [[ $2 =~ r ]] && {
                 echo -n "$o${dim}atlas: scanning root…$reset$c"
                 root=( $(grep -vxf <(printf "%s$n" "${orphans[@]}") <(pacman -Qqtt)) )
-                [[ $2 =~ q ]] || atlas .extract
+                [[ $2 =~ e ]] && atlas .extract
                 log+=r
             }
 
