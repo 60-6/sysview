@@ -18,7 +18,6 @@
         local children csize flatpaks i ii indent last lastc log opt orphans pfx pkg pulse root
         local bold=$'\e[1m' dim=$'\e[2m' red=$'\e[31m' reset=$'\e[m' n=$'\n' r=$'\r' c=$'\e[K' h=$'\e[?25l' s=$'\e[?25h' o=$'\e[7G'
 
-        echo
         atlas .resolve
     }
 
@@ -27,13 +26,14 @@
 #  ┌── routing ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 
     [[ $1 = .resolve ]] && {
-        [[ $cmds =~ [^-\ qinrfosudc] ]] && atlas .syntax
-        [[ ${cmds//[qin]} ]] || cmds+=$default_commands
+        echo
+
+        [[ $cmds =~ [^-\ qirfosudc] ]] && atlas .syntax
+        [[ ${cmds//[qi]} ]] || cmds+=$default_commands
 
         atlas .sig -
 
-        [[ $cmds =~ n ]] || atlas .scan $cmds
-
+        atlas .scan $cmds
         for i in $(fold -w1 <<< $cmds)
         do atlas .$i
         done
@@ -47,7 +47,6 @@
         echo         "  ┌── modifiers ──────────────┐"
         echo         "  │ q  ·  quiet output        │"
         echo         "  │ i  ·  implicit mode       │"
-        echo         "  │ n  ·  no scan caching     │"
         echo         "  └───────────────────────────┘"
         echo
         echo         "  ┌── operations ─────────────┐"
@@ -232,29 +231,27 @@
     }
 
     [[ $1 = .scan ]] && {
-        [[ $2 =~ r ]] && set 0 $2re
+        [[ $2 =~ r ]] && set 0 $2e
         [[ $2 =~ c ]] && set 0 $2o
         [[ $2 =~ [sd] ]] && set 0 $2rfo
         [[ $cmds =~ q ]] && set 0 ${2//e}
 
-        [[ $cmds =~ n ]] || {
-            {
-                modified[p1]=$(stat -c %Y /var/log/pacman.log)
-                modified[f1]=$(stat -c %Y /var/lib/flatpak)
-            } 2>/dev/null
+        {
+            modified[p1]=$(stat -c %Y /var/log/pacman.log)
+            modified[f1]=$(stat -c %Y /var/lib/flatpak)
+        } 2>/dev/null
 
-            [[ ${modified[p0]} && ${modified[p0]} = ${modified[p1]} ]] || {
-                log=${log//[ro]}
-                modified[p0]=${modified[p1]}
-            }
-
-            [[ ${modified[f0]} && ${modified[f0]} = ${modified[f1]} ]] || {
-                log=${log//f}
-                modified[f0]=${modified[f1]}
-            }
-
-            set 0 ${2//[$log]}
+        [[ ${modified[p0]} && ${modified[p0]} = ${modified[p1]} ]] || {
+            log=${log//[ro]}
+            modified[p0]=${modified[p1]}
         }
+
+        [[ ${modified[f0]} && ${modified[f0]} = ${modified[f1]} ]] || {
+            log=${log//f}
+            modified[f0]=${modified[f1]}
+        }
+
+        set 0 ${2//[$log]}
 
         atlas .pulse -
 
